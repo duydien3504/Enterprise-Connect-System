@@ -1,0 +1,30 @@
+## Ignore Visual Studio & .NET Build Artifacts
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+.idea/
+.vscode/
+
+## Ignore Sensitive Environment & Key-Value Configuration Files
+appsettings.json
+appsettings.*.json
+!appsettings.Example.json
+!appsettings.Template.json
+*.env
+*.env.*
+*.local.json
+secrets.json
+launchSettings.json
+
+## Ignore Logs & OS Artifacts
+*.log
+*.tmp
+Thumbs.db
+.DS_Store
+
+
+Docs

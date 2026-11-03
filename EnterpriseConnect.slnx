@@ -1,0 +1,47 @@
+<Solution>
+  <Folder Name="/BuildingBlocks/">
+    <Project Path="BuildingBlocks/EnterpriseConnect.BuildingBlocks.Domain/EnterpriseConnect.BuildingBlocks.Domain.csproj" />
+    <Project Path="BuildingBlocks/EnterpriseConnect.BuildingBlocks.Application/EnterpriseConnect.BuildingBlocks.Application.csproj" />
+    <Project Path="BuildingBlocks/EnterpriseConnect.BuildingBlocks.Infrastructure/EnterpriseConnect.BuildingBlocks.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/Gateway/">
+    <Project Path="EnterpriseConnect.ApiGateway/EnterpriseConnect.ApiGateway.csproj" />
+  </Folder>
+  <Folder Name="/Services/" />
+  <Folder Name="/Services/AdminService/">
+    <Project Path="Services/AdminService/EnterpriseConnect.AdminService.Domain/EnterpriseConnect.AdminService.Domain.csproj" />
+    <Project Path="Services/AdminService/EnterpriseConnect.AdminService.Application/EnterpriseConnect.AdminService.Application.csproj" />
+    <Project Path="Services/AdminService/EnterpriseConnect.AdminService.Infrastructure/EnterpriseConnect.AdminService.Infrastructure.csproj" />
+    <Project Path="Services/AdminService/EnterpriseConnect.AdminService.Api/EnterpriseConnect.AdminService.Api.csproj" />
+  </Folder>
+  <Folder Name="/Services/IdentityService/">
+    <Project Path="Services/IdentityService/EnterpriseConnect.IdentityService.Domain/EnterpriseConnect.IdentityService.Domain.csproj" />
+    <Project Path="Services/IdentityService/EnterpriseConnect.IdentityService.Application/EnterpriseConnect.IdentityService.Application.csproj" />
+    <Project Path="Services/IdentityService/EnterpriseConnect.IdentityService.Infrastructure/EnterpriseConnect.IdentityService.Infrastructure.csproj" />
+    <Project Path="Services/IdentityService/EnterpriseConnect.IdentityService.Api/EnterpriseConnect.IdentityService.Api.csproj" />
+  </Folder>
+  <Folder Name="/Services/MediaService/">
+    <Project Path="Services/MediaService/EnterpriseConnect.MediaService.Domain/EnterpriseConnect.MediaService.Domain.csproj" />
+    <Project Path="Services/MediaService/EnterpriseConnect.MediaService.Application/EnterpriseConnect.MediaService.Application.csproj" />
+    <Project Path="Services/MediaService/EnterpriseConnect.MediaService.Infrastructure/EnterpriseConnect.MediaService.Infrastructure.csproj" />
+    <Project Path="Services/MediaService/EnterpriseConnect.MediaService.Api/EnterpriseConnect.MediaService.Api.csproj" />
+  </Folder>
+  <Folder Name="/Services/MessagingService/">
+    <Project Path="Services/MessagingService/EnterpriseConnect.MessagingService.Domain/EnterpriseConnect.MessagingService.Domain.csproj" />
+    <Project Path="Services/MessagingService/EnterpriseConnect.MessagingService.Application/EnterpriseConnect.MessagingService.Application.csproj" />
+    <Project Path="Services/MessagingService/EnterpriseConnect.MessagingService.Infrastructure/EnterpriseConnect.MessagingService.Infrastructure.csproj" />
+    <Project Path="Services/MessagingService/EnterpriseConnect.MessagingService.Api/EnterpriseConnect.MessagingService.Api.csproj" />
+  </Folder>
+  <Folder Name="/Services/RemoteService/">
+    <Project Path="Services/RemoteService/EnterpriseConnect.RemoteService.Domain/EnterpriseConnect.RemoteService.Domain.csproj" />
+    <Project Path="Services/RemoteService/EnterpriseConnect.RemoteService.Application/EnterpriseConnect.RemoteService.Application.csproj" />
+    <Project Path="Services/RemoteService/EnterpriseConnect.RemoteService.Infrastructure/EnterpriseConnect.RemoteService.Infrastructure.csproj" />
+    <Project Path="Services/RemoteService/EnterpriseConnect.RemoteService.Api/EnterpriseConnect.RemoteService.Api.csproj" />
+  </Folder>
+  <Folder Name="/Tests/" />
+  <Folder Name="/Tests/Services/" />
+  <Folder Name="/Tests/Services/IdentityService/">
+    <Project Path="Tests/Services/IdentityService/EnterpriseConnect.IdentityService.UnitTests/EnterpriseConnect.IdentityService.UnitTests.csproj" />
+    <Project Path="Tests/Services/IdentityService/EnterpriseConnect.IdentityService.IntegrationTests/EnterpriseConnect.IdentityService.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

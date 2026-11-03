@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\EnterpriseConnect.MessagingService.Application\EnterpriseConnect.MessagingService.Application.csproj" />
+    <ProjectReference Include="..\EnterpriseConnect.MessagingService.Domain\EnterpriseConnect.MessagingService.Domain.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\EnterpriseConnect.BuildingBlocks.Infrastructure\EnterpriseConnect.BuildingBlocks.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

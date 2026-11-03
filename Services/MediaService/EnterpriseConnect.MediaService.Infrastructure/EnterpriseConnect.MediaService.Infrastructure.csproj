@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\EnterpriseConnect.MediaService.Application\EnterpriseConnect.MediaService.Application.csproj" />
+    <ProjectReference Include="..\EnterpriseConnect.MediaService.Domain\EnterpriseConnect.MediaService.Domain.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\EnterpriseConnect.BuildingBlocks.Infrastructure\EnterpriseConnect.BuildingBlocks.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

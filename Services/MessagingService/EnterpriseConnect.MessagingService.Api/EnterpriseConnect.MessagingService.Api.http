@@ -1,0 +1,6 @@
+@EnterpriseConnect.MessagingService.Api_HostAddress = http://localhost:5166
+
+GET {{EnterpriseConnect.MessagingService.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
