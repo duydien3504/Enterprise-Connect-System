@@ -1,5 +1,8 @@
 using EnterpriseConnect.BuildingBlocks.Infrastructure.Extensions;
+using EnterpriseConnect.MediaService.Application.Common.Interfaces;
 using EnterpriseConnect.MediaService.Infrastructure.Persistence.Context;
+using EnterpriseConnect.MediaService.Infrastructure.Persistence.Repositories;
+using EnterpriseConnect.MediaService.Infrastructure.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -15,6 +18,10 @@ public static class DependencyInjection
             configuration,
             connectionStringName: "MediaDb",
             migrationsAssembly: typeof(MediaDbContext).Assembly.FullName);
+
+        services.AddScoped<IMediaUnitOfWork, MediaUnitOfWork>();
+        services.AddSingleton<ILiveKitTokenService, LiveKitTokenService>();
+        services.AddSingleton<IWebRtcIceService, WebRtcIceService>();
 
         return services;
     }

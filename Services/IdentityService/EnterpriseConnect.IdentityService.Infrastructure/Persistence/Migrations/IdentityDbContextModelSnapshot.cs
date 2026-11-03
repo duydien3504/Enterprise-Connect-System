@@ -333,6 +333,10 @@ namespace EnterpriseConnect.IdentityService.Infrastructure.Persistence.Migration
                         .HasColumnType("character varying(256)")
                         .HasColumnName("email");
 
+                    b.Property<bool>("EmailConfirmed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("email_confirmed");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -342,6 +346,14 @@ namespace EnterpriseConnect.IdentityService.Infrastructure.Persistence.Migration
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
+
+                    b.Property<string>("LockReason")
+                        .HasColumnType("text")
+                        .HasColumnName("lock_reason");
+
+                    b.Property<DateTimeOffset?>("LockedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("locked_at");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()

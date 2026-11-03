@@ -7,5 +7,7 @@ public enum CallStatus
     Ongoing = 3,
     Ended = 4,
     Missed = 5,
-    Declined = 6
+    Declined = 6,
+    Busy = 7,
+    Failed = 8
 }

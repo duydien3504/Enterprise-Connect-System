@@ -8,6 +8,8 @@ public class Conversation : BaseEntity
     public ConversationType Type { get; set; } = ConversationType.Direct;
     public string? Name { get; set; }
     public string? AvatarUrl { get; set; }
+    public Guid? LastMessageId { get; set; }
+    public DateTimeOffset? LastMessageAt { get; set; }
 
     public virtual ICollection<ConversationMember> Members { get; set; } = new List<ConversationMember>();
     public virtual ICollection<Message> Messages { get; set; } = new List<Message>();

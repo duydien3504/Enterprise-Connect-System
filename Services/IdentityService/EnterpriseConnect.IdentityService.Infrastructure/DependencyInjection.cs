@@ -39,6 +39,27 @@ public static class DependencyInjection
         services.AddSingleton<IPresenceService, MemoryPresenceService>();
         services.AddHttpContextAccessor();
 
+        // Extended Services: Caching, Email, Cloudinary & Image Validation
+        var redisConn = configuration.GetConnectionString("Redis") ?? configuration["RedisSettings:ConnectionString"];
+        if (!string.IsNullOrEmpty(redisConn))
+        {
+            services.AddStackExchangeRedisCache(options =>
+            {
+                options.Configuration = redisConn;
+                options.InstanceName = "EnterpriseConnect:";
+            });
+        }
+        else
+        {
+            // Fallback in-memory distributed cache khi chưa bật Redis server
+            services.AddDistributedMemoryCache();
+        }
+
+        services.AddScoped<ICacheService, DistributedCacheService>();
+        services.AddScoped<IEmailSender, SmtpEmailSender>();
+        services.AddScoped<ICloudinaryStorageService, CloudinaryStorageService>();
+        services.AddScoped<IImageValidator, ImageSharpValidator>();
+
         // JWT Authentication Configuration
         var secretKey = configuration["JwtSettings:Secret"] ?? "REDACTED_JWT_SECRET";
         var issuer = configuration["JwtSettings:Issuer"] ?? "EnterpriseConnect.IdentityService";

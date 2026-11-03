@@ -44,4 +44,7 @@
     <Project Path="Tests/Services/IdentityService/EnterpriseConnect.IdentityService.UnitTests/EnterpriseConnect.IdentityService.UnitTests.csproj" />
     <Project Path="Tests/Services/IdentityService/EnterpriseConnect.IdentityService.IntegrationTests/EnterpriseConnect.IdentityService.IntegrationTests.csproj" />
   </Folder>
+  <Folder Name="/Tests/Services/MediaService/">
+    <Project Path="Tests/Services/MediaService/EnterpriseConnect.MediaService.UnitTests/EnterpriseConnect.MediaService.UnitTests.csproj" />
+  </Folder>
 </Solution>

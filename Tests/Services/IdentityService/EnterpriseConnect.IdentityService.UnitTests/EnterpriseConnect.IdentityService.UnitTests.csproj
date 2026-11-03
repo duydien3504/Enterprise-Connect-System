@@ -21,6 +21,8 @@
     <ProjectReference Include="..\..\..\..\Services\IdentityService\EnterpriseConnect.IdentityService.Domain\EnterpriseConnect.IdentityService.Domain.csproj" />
     <ProjectReference Include="..\..\..\..\Services\IdentityService\EnterpriseConnect.IdentityService.Application\EnterpriseConnect.IdentityService.Application.csproj" />
     <ProjectReference Include="..\..\..\..\Services\IdentityService\EnterpriseConnect.IdentityService.Infrastructure\EnterpriseConnect.IdentityService.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\..\Services\MessagingService\EnterpriseConnect.MessagingService.Domain\EnterpriseConnect.MessagingService.Domain.csproj" />
+    <ProjectReference Include="..\..\..\..\Services\MessagingService\EnterpriseConnect.MessagingService.Application\EnterpriseConnect.MessagingService.Application.csproj" />
   </ItemGroup>
 
 </Project>

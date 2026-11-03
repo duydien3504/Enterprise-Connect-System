@@ -1,7 +1,9 @@
+using EnterpriseConnect.IdentityService.Api.Authorization;
 using EnterpriseConnect.IdentityService.Api.Middleware;
 using EnterpriseConnect.IdentityService.Application;
 using EnterpriseConnect.IdentityService.Infrastructure;
 using EnterpriseConnect.IdentityService.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +11,10 @@ var builder = WebApplication.CreateBuilder(args);
 // Add layers
 builder.Services.AddIdentityApplication();
 builder.Services.AddIdentityInfrastructure(builder.Configuration);
+
+// Custom Authorization Policies
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, DynamicPermissionPolicyProvider>();
+builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

@@ -49,17 +49,33 @@ namespace EnterpriseConnect.MediaService.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("deleted_by");
 
+                    b.Property<bool>("IsCameraOn")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_camera_on");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
-                    b.Property<DateTimeOffset>("JoinTime")
+                    b.Property<bool>("IsMuted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_muted");
+
+                    b.Property<bool>("IsScreenSharing")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_screen_sharing");
+
+                    b.Property<DateTimeOffset?>("JoinTime")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("join_time");
 
                     b.Property<DateTimeOffset?>("LeaveTime")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("leave_time");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
 
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -89,6 +105,10 @@ namespace EnterpriseConnect.MediaService.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTimeOffset?>("ConnectedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("connected_at");
+
                     b.Property<Guid?>("ConversationId")
                         .HasColumnType("uuid")
                         .HasColumnName("conversation_id");
@@ -109,6 +129,14 @@ namespace EnterpriseConnect.MediaService.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("deleted_by");
 
+                    b.Property<int>("DurationSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_seconds");
+
+                    b.Property<string>("EndReason")
+                        .HasColumnType("text")
+                        .HasColumnName("end_reason");
+
                     b.Property<DateTimeOffset?>("EndTime")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("end_time");
@@ -120,6 +148,14 @@ namespace EnterpriseConnect.MediaService.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
+
+                    b.Property<string>("LiveKitRoomName")
+                        .HasColumnType("text")
+                        .HasColumnName("live_kit_room_name");
+
+                    b.Property<int>("Scope")
+                        .HasColumnType("integer")
+                        .HasColumnName("scope");
 
                     b.Property<DateTimeOffset>("StartTime")
                         .HasColumnType("timestamp with time zone")

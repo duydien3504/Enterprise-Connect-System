@@ -11,8 +11,15 @@ public class Message : BaseEntity
     public string Content { get; set; } = string.Empty;
     public MessageType Type { get; set; } = MessageType.Text;
     public MessageStatus Status { get; set; } = MessageStatus.Sent;
+    public bool IsEdited { get; set; } = false;
+    public DateTimeOffset? EditedAt { get; set; }
+    public bool IsPinned { get; set; } = false;
+    public DateTimeOffset? PinnedAt { get; set; }
+    public Guid? PinnedByUserId { get; set; }
 
     public virtual Conversation Conversation { get; set; } = null!;
     public virtual Message? ReplyTo { get; set; }
     public virtual ICollection<Message> Replies { get; set; } = new List<Message>();
+    public virtual ICollection<MessageReaction> Reactions { get; set; } = new List<MessageReaction>();
+    public virtual ICollection<MessageAttachment> Attachments { get; set; } = new List<MessageAttachment>();
 }

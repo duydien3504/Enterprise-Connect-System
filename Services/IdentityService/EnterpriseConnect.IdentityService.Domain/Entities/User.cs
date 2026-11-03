@@ -13,6 +13,9 @@ public class User : BaseEntity
     public string PasswordHash { get; set; } = string.Empty;
     public string? AvatarUrl { get; set; }
     public UserStatus Status { get; set; } = UserStatus.Active;
+    public bool EmailConfirmed { get; set; } = false;
+    public string? LockReason { get; set; }
+    public DateTimeOffset? LockedAt { get; set; }
 
     public virtual Department? Department { get; set; }
     public virtual ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();

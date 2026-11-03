@@ -89,6 +89,65 @@ public class AuthController : ControllerBase
         await _mediator.Send(new ChangePasswordCommand(userId, request.CurrentPassword, request.NewPassword), cancellationToken);
         return Ok(new { message = "Đổi mật khẩu thành công. Toàn bộ phiên làm việc cũ đã bị thu hồi." });
     }
+
+    [HttpPost("register")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Register([FromBody] RegisterUserCommand command, CancellationToken cancellationToken)
+    {
+        var userId = await _mediator.Send(command, cancellationToken);
+        return Ok(new { userId, message = "Đăng ký tài khoản thành công. Vui lòng kiểm tra email để kích hoạt tài khoản." });
+    }
+
+    [HttpGet("verify-email")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> VerifyEmail([FromQuery] string token, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(new VerifyEmailCommand(token), cancellationToken);
+        return Ok(new { message = "Xác thực email thành công! Tài khoản của bạn đã được kích hoạt." });
+    }
+
+    [HttpPost("forgot-password")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordCommand command, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(command, cancellationToken);
+        return Ok(new { message = "Nếu email hợp lệ, mã xác thực OTP 6 số đã được gửi tới hòm thư của bạn (hiệu lực 5 phút)." });
+    }
+
+    [HttpPost("reset-password")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordCommand command, CancellationToken cancellationToken)
+    {
+        await _mediator.Send(command, cancellationToken);
+        return Ok(new { message = "Đặt lại mật khẩu thành công. Bạn có thể sử dụng mật khẩu mới để đăng nhập." });
+    }
+
+    [Authorize]
+    [HttpGet("sessions")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetSessions(CancellationToken cancellationToken)
+    {
+        var userId = _currentUserService.UserId
+            ?? throw new UnauthorizedAccessException("Không xác định được danh tính người dùng.");
+
+        var sessions = await _mediator.Send(new EnterpriseConnect.IdentityService.Application.Features.Auth.Queries.GetUserSessionsQuery(userId), cancellationToken);
+        return Ok(sessions);
+    }
+
+    [Authorize]
+    [HttpDelete("sessions/{sessionId:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> RevokeSession(Guid sessionId, CancellationToken cancellationToken)
+    {
+        var userId = _currentUserService.UserId
+            ?? throw new UnauthorizedAccessException("Không xác định được danh tính người dùng.");
+
+        await _mediator.Send(new RevokeSessionByIdCommand(sessionId, userId), cancellationToken);
+        return Ok(new { message = "Đã ngắt phiên đăng nhập thành công." });
+    }
 }
 
 public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
