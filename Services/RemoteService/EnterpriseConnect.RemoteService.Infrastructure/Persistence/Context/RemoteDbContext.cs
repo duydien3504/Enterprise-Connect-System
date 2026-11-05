@@ -17,16 +17,15 @@ public class RemoteDbContext : BaseDbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // Configure RemoteSession
         modelBuilder.Entity<RemoteSession>(entity =>
         {
             entity.Property(rs => rs.SessionCode).HasMaxLength(20).IsRequired();
+            entity.Property(rs => rs.EndReason).HasMaxLength(500);
             entity.HasIndex(rs => rs.SessionCode).IsUnique();
             entity.HasIndex(rs => rs.RequesterId);
             entity.HasIndex(rs => rs.SupporterId);
         });
 
-        // Configure AccessGrant
         modelBuilder.Entity<AccessGrant>(entity =>
         {
             entity.HasOne(ag => ag.Session)

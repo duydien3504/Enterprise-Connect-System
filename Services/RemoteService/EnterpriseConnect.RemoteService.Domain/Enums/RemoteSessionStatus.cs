@@ -6,5 +6,6 @@ public enum RemoteSessionStatus
     PendingApproval = 2,
     Active = 3,
     Terminated = 4,
-    Expired = 5
+    Expired = 5,
+    Rejected = 6
 }

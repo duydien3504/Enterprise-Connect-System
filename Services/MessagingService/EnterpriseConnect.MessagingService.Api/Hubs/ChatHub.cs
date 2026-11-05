@@ -1,28 +1,18 @@
-using EnterpriseConnect.MessagingService.Application.Common.Interfaces;
+using System.Security.Claims;
 using EnterpriseConnect.MessagingService.Application.Features.Messages.Commands;
 using EnterpriseConnect.MessagingService.Domain.Enums;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
 namespace EnterpriseConnect.MessagingService.Api.Hubs;
 
-public interface IChatClient
-{
-    Task ReceiveMessage(MessageDto message);
-    Task MessageStatusChanged(Guid messageId, MessageStatus status);
-    Task UserTyping(Guid conversationId, Guid userId, bool isTyping);
-    Task MessageReacted(Guid messageId, Guid userId, string emoji, bool isAdded);
-    Task MessageEdited(Guid messageId, string newContent, DateTimeOffset editedAt);
-    Task MessageDeleted(Guid messageId);
-    Task MessagePinned(Guid messageId, bool isPinned, Guid? pinnedBy);
-    Task ToxicWarning(string warningMessage);
-}
-
+[Authorize]
 public class ChatHub : Hub<IChatClient>
 {
-    private readonly MediatR.IMediator _mediator;
+    private readonly IMediator _mediator;
 
-    public ChatHub(MediatR.IMediator mediator)
+    public ChatHub(IMediator mediator)
     {
         _mediator = mediator;
     }
@@ -37,13 +27,15 @@ public class ChatHub : Hub<IChatClient>
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, conversationId.ToString());
     }
 
-    public async Task SendTyping(Guid conversationId, Guid userId, bool isTyping)
+    public async Task SendTyping(Guid conversationId, bool isTyping)
     {
+        var userId = GetCurrentUserId();
         await Clients.OthersInGroup(conversationId.ToString()).UserTyping(conversationId, userId, isTyping);
     }
 
-    public async Task SendMessage(Guid conversationId, Guid senderId, string content, Guid? replyToId = null)
+    public async Task SendMessage(Guid conversationId, string content, Guid? replyToId = null)
     {
+        var senderId = GetCurrentUserId();
         var command = new SendMessageCommand(conversationId, senderId, content, MessageType.Text, replyToId);
         var result = await _mediator.Send(command);
 
@@ -57,5 +49,13 @@ public class ChatHub : Hub<IChatClient>
         {
             await Clients.Group(conversationId.ToString()).ReceiveMessage(result.Message);
         }
+    }
+
+    private Guid GetCurrentUserId()
+    {
+        var sub = Context.User?.FindFirstValue(ClaimTypes.NameIdentifier)
+               ?? Context.User?.FindFirstValue("sub");
+
+        return Guid.TryParse(sub, out var id) ? id : Guid.Empty;
     }
 }

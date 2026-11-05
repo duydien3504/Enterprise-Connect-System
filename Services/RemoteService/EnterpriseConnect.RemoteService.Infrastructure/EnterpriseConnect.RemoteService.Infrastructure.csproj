@@ -1,9 +1,13 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\EnterpriseConnect.RemoteService.Application\EnterpriseConnect.RemoteService.Application.csproj" />
     <ProjectReference Include="..\EnterpriseConnect.RemoteService.Domain\EnterpriseConnect.RemoteService.Domain.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\EnterpriseConnect.BuildingBlocks.Infrastructure\EnterpriseConnect.BuildingBlocks.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <PropertyGroup>
