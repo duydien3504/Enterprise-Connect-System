@@ -91,51 +91,143 @@ public static class IdentityDbSeeder
             }
             await context.SaveChangesAsync();
 
-            // 4. Seed User "duydien3504@gmail.com"
-            var userEmail = "duydien3504@gmail.com";
-            var existingUser = await context.Users.FirstOrDefaultAsync(u => u.Email == userEmail);
-
-            if (existingUser == null)
+            // 4. Seed Seed Users List
+            var usersToSeed = new[]
             {
-                var userId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
-                var user = new User
+                new
                 {
-                    Id = userId,
-                    DepartmentId = itDepartmentId,
+                    Id = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+                    Email = "duydien3504@gmail.com",
                     FullName = "Nguyễn Duy Điền",
-                    Email = userEmail,
                     Phone = "+84901234567",
                     Position = "Senior Enterprise Architect & Administrator",
-                    PasswordHash = passwordHasher.HashPassword("Abcd1234@"),
                     AvatarUrl = "https://ui-avatars.com/api/?name=Duy+Dien&background=0D8ABC&color=fff",
-                    Status = UserStatus.Active,
-                    CreatedAt = DateTimeOffset.UtcNow
-                };
-
-                await context.Users.AddAsync(user);
-                await context.SaveChangesAsync();
-
-                // Assign Admin Role to User
-                await context.UserRoles.AddAsync(new UserRole
+                    Password = "Abcd1234@"
+                },
+                new
                 {
-                    UserId = userId,
-                    RoleId = adminRoleId,
-                    CreatedAt = DateTimeOffset.UtcNow
-                });
+                    Id = Guid.Parse("13371337-1337-1337-1337-133713371337"),
+                    Email = "duydien1337@gmail.com",
+                    FullName = "Duy Điền Dev",
+                    Phone = "+84901337133",
+                    Position = "Software Engineer",
+                    AvatarUrl = "https://ui-avatars.com/api/?name=Duy+Dien&background=10B981&color=fff",
+                    Password = "Abcd1234@"
+                },
+                new
+                {
+                    Id = Guid.Parse("20202020-2020-2020-2020-202020202020"),
+                    Email = "themcao20@gmail.com",
+                    FullName = "Cao Thêm",
+                    Phone = "+84902020202",
+                    Position = "Technical Lead & Solutions Architect",
+                    AvatarUrl = "https://ui-avatars.com/api/?name=Cao+Them&background=6366F1&color=fff",
+                    Password = "Abcd1234@"
+                }
+            };
 
-                // Update manager for IT department
-                itDepartment.ManagerId = userId;
-                context.Departments.Update(itDepartment);
+            var seededUsers = new List<User>();
 
-                await context.SaveChangesAsync();
-                logger.LogInformation("Đã khởi tạo thành công tài khoản: {Email}", userEmail);
-            }
-            else
+            foreach (var item in usersToSeed)
             {
-                existingUser.PasswordHash = passwordHasher.HashPassword("Abcd1234@");
-                existingUser.Status = UserStatus.Active;
+                var existingUser = await context.Users
+                    .Include(u => u.UserRoles)
+                    .FirstOrDefaultAsync(u => u.Email == item.Email);
+
+                var passwordHash = passwordHasher.HashPassword(item.Password);
+
+                if (existingUser == null)
+                {
+                    var user = new User
+                    {
+                        Id = item.Id,
+                        DepartmentId = itDepartmentId,
+                        FullName = item.FullName,
+                        Email = item.Email,
+                        Phone = item.Phone,
+                        Position = item.Position,
+                        PasswordHash = passwordHash,
+                        AvatarUrl = item.AvatarUrl,
+                        Status = UserStatus.Active,
+                        EmailConfirmed = true,
+                        CreatedAt = DateTimeOffset.UtcNow
+                    };
+
+                    await context.Users.AddAsync(user);
+                    await context.UserRoles.AddAsync(new UserRole
+                    {
+                        UserId = user.Id,
+                        RoleId = adminRoleId,
+                        CreatedAt = DateTimeOffset.UtcNow
+                    });
+
+                    await context.SaveChangesAsync();
+                    logger.LogInformation("Đã khởi tạo thành công tài khoản: {Email}", item.Email);
+                    seededUsers.Add(user);
+                }
+                else
+                {
+                    existingUser.FullName = item.FullName;
+                    existingUser.PasswordHash = passwordHash;
+                    existingUser.Status = UserStatus.Active;
+                    existingUser.EmailConfirmed = true;
+                    existingUser.Phone = item.Phone;
+                    existingUser.Position = item.Position;
+                    existingUser.AvatarUrl = item.AvatarUrl;
+
+                    if (!existingUser.UserRoles.Any(ur => ur.RoleId == adminRoleId))
+                    {
+                        existingUser.UserRoles.Add(new UserRole
+                        {
+                            UserId = existingUser.Id,
+                            RoleId = adminRoleId,
+                            CreatedAt = DateTimeOffset.UtcNow
+                        });
+                    }
+
+                    await context.SaveChangesAsync();
+                    logger.LogInformation("Đã cập nhật tài khoản: {Email}", item.Email);
+                    seededUsers.Add(existingUser);
+                }
+            }
+
+            // Assign IT department manager if not assigned
+            if (itDepartment.ManagerId == null && seededUsers.Count > 0)
+            {
+                itDepartment.ManagerId = seededUsers[0].Id;
+                context.Departments.Update(itDepartment);
                 await context.SaveChangesAsync();
-                logger.LogInformation("Đã cập nhật mật khẩu cho tài khoản: {Email}", userEmail);
+            }
+
+            // 5. Seed Contact giữa duydien1337@gmail.com và themcao20@gmail.com
+            var user1 = seededUsers.FirstOrDefault(u => u.Email == "duydien1337@gmail.com");
+            var user2 = seededUsers.FirstOrDefault(u => u.Email == "themcao20@gmail.com");
+
+            if (user1 != null && user2 != null)
+            {
+                var existingContact = await context.Contacts
+                    .FirstOrDefaultAsync(c =>
+                        (c.RequesterId == user1.Id && c.ReceiverId == user2.Id) ||
+                        (c.RequesterId == user2.Id && c.ReceiverId == user1.Id));
+
+                if (existingContact == null)
+                {
+                    await context.Contacts.AddAsync(new Contact
+                    {
+                        Id = Guid.NewGuid(),
+                        RequesterId = user1.Id,
+                        ReceiverId = user2.Id,
+                        Status = ContactStatus.Accepted,
+                        CreatedAt = DateTimeOffset.UtcNow
+                    });
+                    await context.SaveChangesAsync();
+                    logger.LogInformation("Đã khởi tạo kết nối Contact (Accepted) giữa {Email1} và {Email2}", user1.Email, user2.Email);
+                }
+                else if (existingContact.Status != ContactStatus.Accepted)
+                {
+                    existingContact.Status = ContactStatus.Accepted;
+                    await context.SaveChangesAsync();
+                }
             }
         }
         catch (Exception ex)

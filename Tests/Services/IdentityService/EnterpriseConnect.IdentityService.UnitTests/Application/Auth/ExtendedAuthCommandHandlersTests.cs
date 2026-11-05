@@ -137,4 +137,75 @@ public class ExtendedAuthCommandHandlersTests
         session.RevokedAt.Should().NotBeNull();
         _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task RegisterUser_WhenValid_ShouldCreateUserWithInactiveStatusAndSendActivationEmail()
+    {
+        // Arrange
+        var email = "newuser@company.com";
+        _userRepoMock.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((User?)null);
+
+        _passwordHasherMock.Setup(p => p.HashPassword(It.IsAny<string>()))
+            .Returns("hashed_pwd");
+
+        User? addedUser = null;
+        _userRepoMock.Setup(r => r.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .Callback<User, CancellationToken>((u, _) => addedUser = u);
+
+        var publicUrlMock = new Mock<IPublicUrlProvider>();
+        publicUrlMock.Setup(p => p.IdentityBaseUrl).Returns("https://localhost:7272/identity");
+
+        var handler = new RegisterUserCommandHandler(
+            _uowMock.Object,
+            _passwordHasherMock.Object,
+            _cacheServiceMock.Object,
+            _emailSenderMock.Object,
+            publicUrlMock.Object);
+
+        // Act
+        var command = new RegisterUserCommand(email, "Password123@", "New User", null, "Dev", "0123456789");
+        var result = await handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        result.Should().NotBeEmpty();
+        addedUser.Should().NotBeNull();
+        addedUser!.Status.Should().Be(UserStatus.Inactive, "Tài khoản mới tạo phải ở trạng thái Inactive chờ kích hoạt");
+        addedUser.EmailConfirmed.Should().BeFalse();
+        _cacheServiceMock.Verify(c => c.SetAsync(It.Is<string>(k => k.StartsWith("email_verify:")), It.IsAny<string>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()), Times.Once);
+        _emailSenderMock.Verify(e => e.SendEmailAsync(email, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task VerifyEmail_WhenTokenValid_ShouldSetStatusActiveAndEmailConfirmedTrue()
+    {
+        // Arrange
+        var userId = Guid.NewGuid();
+        var rawToken = "sample_raw_token_123";
+        var user = new User
+        {
+            Id = userId,
+            Email = "pending@company.com",
+            Status = UserStatus.Inactive,
+            EmailConfirmed = false
+        };
+
+        _cacheServiceMock.Setup(c => c.GetAsync<string>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(userId.ToString());
+
+        _userRepoMock.Setup(r => r.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var handler = new VerifyEmailCommandHandler(_uowMock.Object, _cacheServiceMock.Object);
+
+        // Act
+        var result = await handler.Handle(new VerifyEmailCommand(rawToken), CancellationToken.None);
+
+        // Assert
+        result.Should().BeTrue();
+        user.Status.Should().Be(UserStatus.Active, "Kích hoạt email thành công phải chuyển trạng thái sang Active");
+        user.EmailConfirmed.Should().BeTrue();
+        _userRepoMock.Verify(r => r.UpdateAsync(user, It.IsAny<CancellationToken>()), Times.Once);
+        _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

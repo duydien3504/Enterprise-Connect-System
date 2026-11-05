@@ -1,3 +1,4 @@
+using EnterpriseConnect.MediaService.Api.Extensions;
 using EnterpriseConnect.MediaService.Api.Hubs;
 using EnterpriseConnect.MediaService.Api.Services;
 using EnterpriseConnect.MediaService.Application;
@@ -8,8 +9,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddMediaForwardedHeaders();
+builder.Services.AddMediaSwagger();
 
 // Clean Architecture Layers
 builder.Services.AddMediaApplication();
@@ -21,15 +22,10 @@ builder.Services.AddScoped<ICallNotificationService, CallNotificationService>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseForwardedHeaders();
+app.UseMediaSwagger(app.Environment);
 
 app.UseHttpsRedirection();
-
 app.MapControllers();
 app.MapHub<CallHub>("/hubs/call");
 

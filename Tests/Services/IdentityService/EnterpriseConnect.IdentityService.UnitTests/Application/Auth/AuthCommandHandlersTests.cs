@@ -43,7 +43,8 @@ public class AuthCommandHandlersTests
             Email = email,
             FullName = "John Doe",
             PasswordHash = hashedPassword,
-            Status = UserStatus.Active
+            Status = UserStatus.Active,
+            EmailConfirmed = true
         };
 
         _userRepoMock.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>()))

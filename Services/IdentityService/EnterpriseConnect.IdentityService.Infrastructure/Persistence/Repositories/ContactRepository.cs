@@ -70,4 +70,15 @@ public class ContactRepository : EfRepository<Contact>, IContactRepository
         }
         return (false, null);
     }
+
+    public async Task<bool> HardDeleteBetweenUsersAsync(Guid userA, Guid userB, CancellationToken cancellationToken = default)
+    {
+        var deletedCount = await _identityDbContext.Contacts
+            .IgnoreQueryFilters()
+            .Where(c => (c.RequesterId == userA && c.ReceiverId == userB) ||
+                        (c.RequesterId == userB && c.ReceiverId == userA))
+            .ExecuteDeleteAsync(cancellationToken);
+
+        return deletedCount > 0;
+    }
 }

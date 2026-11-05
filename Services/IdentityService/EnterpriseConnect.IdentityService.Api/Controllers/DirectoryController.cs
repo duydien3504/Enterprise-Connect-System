@@ -1,5 +1,6 @@
 using EnterpriseConnect.IdentityService.Application.Common.Interfaces;
 using EnterpriseConnect.IdentityService.Application.Features.Departments.Queries;
+using EnterpriseConnect.IdentityService.Application.Features.Users.DTOs;
 using EnterpriseConnect.IdentityService.Application.Features.Users.Queries;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;

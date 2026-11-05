@@ -1,3 +1,4 @@
+using EnterpriseConnect.MessagingService.Api.Extensions;
 using EnterpriseConnect.MessagingService.Api.Hubs;
 using EnterpriseConnect.MessagingService.Application;
 using EnterpriseConnect.MessagingService.Infrastructure;
@@ -9,21 +10,16 @@ builder.Services.AddMessagingApplication();
 builder.Services.AddMessagingInfrastructure(builder.Configuration);
 
 builder.Services.AddControllers();
+builder.Services.AddMessagingForwardedHeaders();
 builder.Services.AddSignalR();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddMessagingSwagger();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseForwardedHeaders();
+app.UseMessagingSwagger(app.Environment);
 
 app.UseHttpsRedirection();
-
 app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
 

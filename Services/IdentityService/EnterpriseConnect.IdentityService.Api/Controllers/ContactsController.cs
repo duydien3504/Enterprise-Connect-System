@@ -84,7 +84,7 @@ public class ContactsController : ControllerBase
             ?? throw new UnauthorizedAccessException("Không xác định được danh tính người dùng.");
 
         var result = await _mediator.Send(new UnblockUserCommand(currentUserId, targetUserId), cancellationToken);
-        return Ok(new { success = result, message = result ? "Đã bỏ chặn thành công." : "Bạn không phải là người chặn người dùng này." });
+        return Ok(new { success = result, message = result ? "Đã bỏ chặn thành công." : "Không tìm thấy thông tin chặn hoặc bạn không phải là người chặn người dùng này." });
     }
 
     [AllowAnonymous]

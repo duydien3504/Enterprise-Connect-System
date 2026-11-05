@@ -59,6 +59,7 @@ public static class DependencyInjection
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<ICloudinaryStorageService, CloudinaryStorageService>();
         services.AddScoped<IImageValidator, ImageSharpValidator>();
+        services.AddSingleton<IPublicUrlProvider, PublicUrlProvider>();
 
         // JWT Authentication Configuration
         var secretKey = configuration["JwtSettings:Secret"] ?? "REDACTED_JWT_SECRET";
@@ -84,6 +85,19 @@ public static class DependencyInjection
                 ValidAudience = audience,
                 ValidateLifetime = true,
                 ClockSkew = TimeSpan.Zero
+            };
+
+            options.Events = new JwtBearerEvents
+            {
+                OnMessageReceived = context =>
+                {
+                    var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+                    if (!string.IsNullOrEmpty(authHeader) && !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        context.Token = authHeader.Trim();
+                    }
+                    return Task.CompletedTask;
+                }
             };
         });
 

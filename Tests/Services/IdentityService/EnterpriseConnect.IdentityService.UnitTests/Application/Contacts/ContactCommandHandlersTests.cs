@@ -142,4 +142,83 @@ public class ContactCommandHandlersTests
         savedBlock.Status.Should().Be(ContactStatus.Blocked);
         _uowMock.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task UnblockUser_WhenBlockedByRequester_ShouldHardDeleteAndReturnTrue()
+    {
+        // Arrange
+        var blockerId = Guid.NewGuid();
+        var blockedUserId = Guid.NewGuid();
+        var handler = new UnblockUserCommandHandler(_uowMock.Object);
+
+        var existingBlocked = new Contact
+        {
+            Id = Guid.NewGuid(),
+            RequesterId = blockerId,
+            ReceiverId = blockedUserId,
+            Status = ContactStatus.Blocked
+        };
+
+        _contactRepoMock.Setup(r => r.GetContactBetweenUsersAsync(blockerId, blockedUserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingBlocked);
+
+        _contactRepoMock.Setup(r => r.HardDeleteBetweenUsersAsync(blockerId, blockedUserId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await handler.Handle(new UnblockUserCommand(blockerId, blockedUserId), CancellationToken.None);
+
+        // Assert
+        result.Should().BeTrue();
+        _contactRepoMock.Verify(r => r.HardDeleteBetweenUsersAsync(blockerId, blockedUserId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UnblockUser_WhenNotBlockedOrNotBlocker_ShouldReturnFalse()
+    {
+        // Arrange (Attempting to unblock someone you didn't block)
+        var blockerId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+        var handler = new UnblockUserCommandHandler(_uowMock.Object);
+
+        _contactRepoMock.Setup(r => r.GetContactBetweenUsersAsync(otherUserId, blockerId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Contact?)null);
+
+        // Act
+        var result = await handler.Handle(new UnblockUserCommand(otherUserId, blockerId), CancellationToken.None);
+
+        // Assert
+        result.Should().BeFalse();
+        _contactRepoMock.Verify(r => r.HardDeleteBetweenUsersAsync(It.IsAny<Guid>(), It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RemoveContact_WhenAccepted_ShouldHardDeleteAndReturnTrue()
+    {
+        // Arrange
+        var userA = Guid.NewGuid();
+        var userB = Guid.NewGuid();
+        var handler = new RemoveContactCommandHandler(_uowMock.Object);
+
+        var existingFriendship = new Contact
+        {
+            Id = Guid.NewGuid(),
+            RequesterId = userA,
+            ReceiverId = userB,
+            Status = ContactStatus.Accepted
+        };
+
+        _contactRepoMock.Setup(r => r.GetContactBetweenUsersAsync(userA, userB, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingFriendship);
+
+        _contactRepoMock.Setup(r => r.HardDeleteBetweenUsersAsync(userA, userB, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await handler.Handle(new RemoveContactCommand(userA, userB), CancellationToken.None);
+
+        // Assert
+        result.Should().BeTrue();
+        _contactRepoMock.Verify(r => r.HardDeleteBetweenUsersAsync(userA, userB, It.IsAny<CancellationToken>()), Times.Once);
+    }
 }

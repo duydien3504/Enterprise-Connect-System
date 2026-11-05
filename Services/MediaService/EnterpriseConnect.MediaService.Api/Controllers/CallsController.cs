@@ -1,3 +1,4 @@
+using EnterpriseConnect.MediaService.Api.DTOs;
 using EnterpriseConnect.MediaService.Application.Common.Models;
 using EnterpriseConnect.MediaService.Application.Features.Calls.Commands.EndCall;
 using EnterpriseConnect.MediaService.Application.Features.Calls.Commands.InitiateCall;
@@ -6,7 +7,6 @@ using EnterpriseConnect.MediaService.Application.Features.Calls.Commands.Respond
 using EnterpriseConnect.MediaService.Application.Features.Calls.Commands.UpdateMediaState;
 using EnterpriseConnect.MediaService.Application.Features.Calls.Queries.GetCallHistory;
 using EnterpriseConnect.MediaService.Application.Features.Calls.Queries.GetIceServers;
-using EnterpriseConnect.MediaService.Domain.Enums;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -122,29 +122,3 @@ public class CallsController : ControllerBase
         return Ok(result.Data);
     }
 }
-
-public record InitiateCallRequest(
-    Guid ConversationId,
-    Guid InitiatorId,
-    CallType CallType,
-    CallScope Scope,
-    List<Guid> ParticipantIds);
-
-public record RespondCallRequest(
-    Guid UserId,
-    bool Accept,
-    string? DeclineReason);
-
-public record EndCallRequest(
-    Guid UserId,
-    string? Reason);
-
-public record UpdateMediaStateRequest(
-    Guid UserId,
-    bool? IsMuted,
-    bool? IsCameraOn,
-    bool? IsScreenSharing);
-
-public record InviteParticipantsRequest(
-    Guid InviterId,
-    List<Guid> UserIds);
