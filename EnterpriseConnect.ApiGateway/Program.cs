@@ -1,4 +1,5 @@
 using EnterpriseConnect.ApiGateway.Extensions;
+using EnterpriseConnect.ApiGateway.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,6 +17,7 @@ var app = builder.Build();
 
 // 3. Pipeline Execution
 app.UseCors(CorsExtensions.PolicyName);
+app.UseGatewaySecurityHeaders();
 app.UseGatewayCorrelationId();
 app.UseInternalEndpointShield();
 app.UseGatewaySwagger();
@@ -33,6 +35,8 @@ app.MapGet("/", () => Results.Ok(new
     swagger = "/swagger"
 }));
 app.MapGet("/health", () => Results.Ok("Healthy"));
+app.MapGet("/swagger/unified/swagger.json", async (UnifiedSwaggerService service, CancellationToken ct) =>
+    Results.Content(await service.GetUnifiedSwaggerJsonAsync(ct), "application/json"));
 app.MapReverseProxy();
 
 app.Run();

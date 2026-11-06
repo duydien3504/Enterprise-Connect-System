@@ -1,9 +1,17 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\EnterpriseConnect.AdminService.Application\EnterpriseConnect.AdminService.Application.csproj" />
     <ProjectReference Include="..\EnterpriseConnect.AdminService.Domain\EnterpriseConnect.AdminService.Domain.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\EnterpriseConnect.BuildingBlocks.Infrastructure\EnterpriseConnect.BuildingBlocks.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CloudinaryDotNet" Version="1.26.2" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -1,4 +1,5 @@
 using System.Text;
+using EnterpriseConnect.BuildingBlocks.Infrastructure.Extensions;
 using EnterpriseConnect.RemoteService.Api.Extensions;
 using EnterpriseConnect.RemoteService.Api.Hubs;
 using EnterpriseConnect.RemoteService.Api.Middleware;
@@ -14,11 +15,10 @@ var builder = WebApplication.CreateBuilder(args);
 // 1. Core Services & Clean Architecture Layers
 builder.Services.AddRemoteApplication();
 builder.Services.AddRemoteInfrastructure(builder.Configuration);
+builder.Services.AddDistributedAuditClient();
 
 // 2. JWT Authentication & SignalR Token Support
-var jwtKey = builder.Configuration["JwtSettings:Secret"]
-    ?? "REDACTED_JWT_SECRET";
-
+var jwtKey = builder.Configuration["JwtSettings:Secret"] ?? "REDACTED_JWT_SECRET";
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -44,13 +44,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 if (!string.IsNullOrEmpty(authHeader))
                 {
                     context.Token = authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
-                        ? authHeader.Substring("Bearer ".Length).Trim()
-                        : authHeader.Trim();
+                        ? authHeader.Substring("Bearer ".Length).Trim() : authHeader.Trim();
                 }
 
                 var accessToken = context.Request.Query["access_token"];
-                var path = context.HttpContext.Request.Path;
-                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
                 {
                     context.Token = accessToken;
                 }
@@ -66,10 +64,10 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.SetIsOriginAllowed(_ => true)
-              .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials();
+        policy.SetIsOriginAllowed(origin =>
+                  Uri.TryCreate(origin, UriKind.Absolute, out var u) &&
+                  (u.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || u.Host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase)))
+              .AllowAnyMethod().AllowAnyHeader().AllowCredentials();
     });
 });
 

@@ -37,7 +37,13 @@ public class UserRepository : EfRepository<User>, IUserRepository
             .Distinct()
             .ToListAsync(cancellationToken);
 
-        return new UserRolePermissionsDto(roleNames, permissionNames);
+        var roleIds = await _identityDbContext.UserRoles
+            .Where(ur => ur.UserId == userId)
+            .Select(ur => ur.RoleId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return new UserRolePermissionsDto(roleNames, permissionNames) { RoleIds = roleIds };
     }
 
     public async Task<(IReadOnlyList<UserDirectoryDto> Items, int TotalCount)> SearchUsersAsync(

@@ -92,7 +92,11 @@ public class RemoteSessionsController : ControllerBase
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetSessionDetails(Guid id)
     {
-        var result = await _mediator.Send(new GetSessionDetailsQuery(id));
+        var result = await _mediator.Send(new GetSessionDetailsQuery(id, CurrentUserId));
+        if (!result.Succeeded && result.Error?.StartsWith("Access denied") == true)
+        {
+            return Forbid();
+        }
         return result.Succeeded ? Ok(result.Data) : BadRequest(new { error = result.Error });
     }
 

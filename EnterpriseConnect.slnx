@@ -40,12 +40,18 @@
   </Folder>
   <Folder Name="/Tests/" />
   <Folder Name="/Tests/Services/" />
+  <Folder Name="/Tests/Services/AdminService/">
+    <Project Path="Tests/Services/AdminService/EnterpriseConnect.AdminService.UnitTests/EnterpriseConnect.AdminService.UnitTests.csproj" />
+  </Folder>
   <Folder Name="/Tests/Services/IdentityService/">
     <Project Path="Tests/Services/IdentityService/EnterpriseConnect.IdentityService.UnitTests/EnterpriseConnect.IdentityService.UnitTests.csproj" />
     <Project Path="Tests/Services/IdentityService/EnterpriseConnect.IdentityService.IntegrationTests/EnterpriseConnect.IdentityService.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/Tests/Services/MediaService/">
     <Project Path="Tests/Services/MediaService/EnterpriseConnect.MediaService.UnitTests/EnterpriseConnect.MediaService.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/Tests/Services/MessagingService/">
+    <Project Path="Tests/Services/MessagingService/EnterpriseConnect.MessagingService.UnitTests/EnterpriseConnect.MessagingService.UnitTests.csproj" />
   </Folder>
   <Folder Name="/Tests/Services/RemoteService/">
     <Project Path="Tests/Services/RemoteService/EnterpriseConnect.RemoteService.UnitTests/EnterpriseConnect.RemoteService.UnitTests.csproj" />

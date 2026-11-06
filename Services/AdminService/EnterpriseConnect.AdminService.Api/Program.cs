@@ -1,64 +1,96 @@
+using System.Text;
+using EnterpriseConnect.AdminService.Api.Extensions;
+using EnterpriseConnect.AdminService.Api.Middleware;
+using EnterpriseConnect.AdminService.Application;
 using EnterpriseConnect.AdminService.Infrastructure;
-using Microsoft.OpenApi.Models;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// 1. Core Services & Clean Architecture Layers
+builder.Services.AddApplication();
 builder.Services.AddAdminInfrastructure(builder.Configuration);
 
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options =>
-{
-    options.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "EnterpriseConnect Admin API",
-        Version = "v1",
-        Description = "Admin API for EnterpriseConnect"
-    });
+// 2. JWT Authentication
+var jwtKey = builder.Configuration["JwtSettings:Secret"]
+    ?? "REDACTED_JWT_SECRET";
 
-    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
     {
-        Description = "JWT Authorization header. Dán trực tiếp chuỗi token (không cần gõ chữ Bearer).",
-        Name = "Authorization",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey
-    });
-
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
+        options.RequireHttpsMetadata = false;
+        options.SaveToken = true;
+        options.TokenValidationParameters = new TokenValidationParameters
         {
-            new OpenApiSecurityScheme
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            ValidateIssuer = true,
+            ValidIssuer = builder.Configuration["JwtSettings:Issuer"] ?? "EnterpriseConnect.IdentityService",
+            ValidateAudience = true,
+            ValidAudience = builder.Configuration["JwtSettings:Audience"] ?? "EnterpriseConnect.Clients",
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
             {
-                Reference = new OpenApiReference
+                var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+                if (!string.IsNullOrEmpty(authHeader))
                 {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
+                    context.Token = authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                        ? authHeader.Substring("Bearer ".Length).Trim()
+                        : authHeader.Trim();
                 }
-            },
-            Array.Empty<string>()
-        }
+                return Task.CompletedTask;
+            }
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+// 3. API, CORS & Middleware
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.SetIsOriginAllowed(origin =>
+                  Uri.TryCreate(origin, UriKind.Absolute, out var u) &&
+                  (u.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || u.Host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase)))
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials();
     });
 });
 
+builder.Services.AddControllers();
+builder.Services.AddAdminForwardedHeaders();
+builder.Services.AddAdminSwagger();
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+// 4. Auto-migration
+using (var scope = app.Services.CreateScope())
 {
-    app.UseSwagger(c =>
-    {
-        c.SerializeAsV2 = true;
-    });
-
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "EnterpriseConnect Admin API v1");
-        c.RoutePrefix = "swagger";
-    });
+    var dbContext = scope.ServiceProvider.GetRequiredService<EnterpriseConnect.AdminService.Infrastructure.Persistence.Context.AdminDbContext>();
+    Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.Migrate(dbContext.Database);
 }
 
-app.UseHttpsRedirection();
+// 5. Request Pipeline
+app.UseForwardedHeaders();
+app.UseCors();
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+app.UseAdminSwagger(app.Environment);
 
-app.MapGet("/", () => Results.Ok("AdminService is running..."));
+app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
+app.MapGet("/", () => Results.Ok("EnterpriseConnect AdminService is running..."));
 
 app.Run();
+
+public partial class Program { }

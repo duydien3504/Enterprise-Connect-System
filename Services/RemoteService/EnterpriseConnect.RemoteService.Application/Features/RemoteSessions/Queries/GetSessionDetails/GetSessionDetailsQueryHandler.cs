@@ -26,6 +26,17 @@ public class GetSessionDetailsQueryHandler : IRequestHandler<GetSessionDetailsQu
             return Result<RemoteSessionDto>.Failure("Session not found.");
         }
 
+        // BOLA / IDOR Prevention: Bắt buộc người truy vấn phải là Requester hoặc Supporter của phiên
+        if (request.CurrentUserId.HasValue && request.CurrentUserId.Value != Guid.Empty)
+        {
+            var userId = request.CurrentUserId.Value;
+            var isParticipant = session.RequesterId == userId || session.SupporterId == userId;
+            if (!isParticipant)
+            {
+                return Result<RemoteSessionDto>.Failure("Access denied: You are not a participant of this remote session.");
+            }
+        }
+
         return Result<RemoteSessionDto>.Success(session.ToDto());
     }
 }

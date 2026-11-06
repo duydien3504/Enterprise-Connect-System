@@ -13,11 +13,13 @@ public class MessagingUnitOfWork : IMessagingUnitOfWork
         Conversations = new ConversationRepository(_context);
         Messages = new MessageRepository(_context);
         AiSummaries = new AiSummaryRepository(_context);
+        KnowledgeChunks = new KnowledgeChunkRepository(_context);
     }
 
     public IConversationRepository Conversations { get; }
     public IMessageRepository Messages { get; }
     public IAiSummaryRepository AiSummaries { get; }
+    public IKnowledgeChunkRepository KnowledgeChunks { get; }
 
     public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {

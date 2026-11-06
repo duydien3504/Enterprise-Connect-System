@@ -4,5 +4,6 @@ using MediatR;
 namespace EnterpriseConnect.RemoteService.Application.Features.RemoteSessions.Queries.GetSessionDetails;
 
 public record GetSessionDetailsQuery(
-    Guid SessionId
+    Guid SessionId,
+    Guid? CurrentUserId = null
 ) : IRequest<Result<RemoteSessionDto>>;

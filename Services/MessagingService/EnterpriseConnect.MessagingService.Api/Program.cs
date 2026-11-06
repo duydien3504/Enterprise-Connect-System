@@ -1,4 +1,5 @@
 using System.Text;
+using EnterpriseConnect.BuildingBlocks.Infrastructure.Extensions;
 using EnterpriseConnect.MessagingService.Api.Extensions;
 using EnterpriseConnect.MessagingService.Api.Hubs;
 using EnterpriseConnect.MessagingService.Api.Middleware;
@@ -12,6 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 // 1. Core Services & Layers
 builder.Services.AddMessagingApplication();
 builder.Services.AddMessagingInfrastructure(builder.Configuration);
+builder.Services.AddDistributedAuditClient();
 
 // 2. JWT Authentication & SignalR Token Support
 var jwtKey = builder.Configuration["JwtSettings:Secret"] ?? "REDACTED_JWT_SECRET";
@@ -62,7 +64,9 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.SetIsOriginAllowed(_ => true)
+        policy.SetIsOriginAllowed(origin =>
+                  Uri.TryCreate(origin, UriKind.Absolute, out var u) &&
+                  (u.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || u.Host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase)))
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();

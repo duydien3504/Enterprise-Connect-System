@@ -1,3 +1,4 @@
+using EnterpriseConnect.BuildingBlocks.Infrastructure.Extensions;
 using EnterpriseConnect.IdentityService.Api.Authorization;
 using EnterpriseConnect.IdentityService.Api.Extensions;
 using EnterpriseConnect.IdentityService.Api.Middleware;
@@ -11,6 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 // 1. Core & Architecture Services
 builder.Services.AddIdentityApplication();
 builder.Services.AddIdentityInfrastructure(builder.Configuration);
+builder.Services.AddDistributedAuditClient();
 builder.Services.AddIdentityForwardedHeaders(builder.Configuration);
 builder.Services.AddIdentityCors();
 

@@ -27,24 +27,40 @@ public class KnowledgeAssistant : IKnowledgeAssistant
             .Where(k => (k.DepartmentId == null || k.DepartmentId == departmentId)
                      && (k.RoleId == null || roleIdList.Contains(k.RoleId.Value)));
 
-        // Tối ưu tìm kiếm văn bản liên quan (Semantic / Text matching)
-        var keywords = question.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(k => k.Length > 2)
-            .Take(5)
+        if (string.IsNullOrWhiteSpace(question))
+        {
+            return new KnowledgeAnswerResult(
+                "Vui lòng nhập nội dung câu hỏi sau lệnh /a (Ví dụ: /a chính sách bảo mật của công ty là gì?).",
+                Array.Empty<string>());
+        }
+
+        var punctuation = new[] { ' ', '?', '.', ',', '!', ';', ':', '(', ')', '"', '\'', '/', '\\' };
+        var keywords = question.Split(punctuation, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(k => k.Length >= 2)
+            .Take(8)
             .ToList();
+
+        if (keywords.Count == 0)
+        {
+            return new KnowledgeAnswerResult(
+                "Rất tiếc, tôi không tìm thấy tài liệu nội bộ nào phù hợp với câu hỏi của bạn hoặc bạn chưa được cấp quyền truy cập tài liệu liên quan.",
+                Array.Empty<string>());
+        }
 
         var chunks = await query.ToListAsync(cancellationToken);
 
-        // Lấy top 4 chunks khớp ngữ cảnh nhất
+        // Lọc top 4 chunks khớp từ khóa (Score > 0) và loại bỏ trùng lặp nội dung
         var relevantChunks = chunks
             .Select(c => new
             {
                 Chunk = c,
                 Score = keywords.Count(kw => c.Content.Contains(kw, StringComparison.OrdinalIgnoreCase) || c.DocumentTitle.Contains(kw, StringComparison.OrdinalIgnoreCase))
             })
+            .Where(x => x.Score > 0)
             .OrderByDescending(x => x.Score)
+            .GroupBy(x => new { x.Chunk.DocumentId, x.Chunk.Content })
+            .Select(g => g.First().Chunk)
             .Take(4)
-            .Select(x => x.Chunk)
             .ToList();
 
         var sources = relevantChunks.Select(c => c.DocumentTitle).Distinct().ToList();

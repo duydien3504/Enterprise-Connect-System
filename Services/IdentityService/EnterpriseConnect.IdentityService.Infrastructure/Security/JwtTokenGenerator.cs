@@ -18,7 +18,10 @@ public class JwtTokenGenerator : IJwtTokenGenerator
         _configuration = configuration;
     }
 
-    public string GenerateAccessToken(User user, IEnumerable<string> roles, IEnumerable<string> permissions)
+    public string GenerateAccessToken(User user, IEnumerable<string> roles, IEnumerable<string> permissions) =>
+        GenerateAccessToken(user, roles, permissions, null);
+
+    public string GenerateAccessToken(User user, IEnumerable<string> roles, IEnumerable<string> permissions, IEnumerable<Guid>? roleIds)
     {
         var secretKey = _configuration["JwtSettings:Secret"] ?? "REDACTED_JWT_SECRET";
         var issuer = _configuration["JwtSettings:Issuer"] ?? "EnterpriseConnect.IdentityService";
@@ -46,6 +49,14 @@ public class JwtTokenGenerator : IJwtTokenGenerator
         {
             claims.Add(new Claim(ClaimTypes.Role, role));
             claims.Add(new Claim("role", role));
+        }
+
+        if (roleIds != null)
+        {
+            foreach (var roleId in roleIds)
+            {
+                claims.Add(new Claim("role_id", roleId.ToString()));
+            }
         }
 
         // Add Permission Claims

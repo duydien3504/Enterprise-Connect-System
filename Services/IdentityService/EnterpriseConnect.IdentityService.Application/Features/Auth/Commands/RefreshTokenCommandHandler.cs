@@ -52,10 +52,14 @@ public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, A
         }
 
         // Lấy quyền hạn mới nhất
-        var (roles, permissions) = await _uow.Users.GetRolesAndPermissionsByUserIdAsync(user.Id, cancellationToken);
+        var rolePerms = await _uow.Users.GetRolesAndPermissionsByUserIdAsync(user.Id, cancellationToken);
+        var roles = rolePerms.Roles;
+        var permissions = rolePerms.Permissions;
 
         // Rotate Refresh Token
-        var newAccessToken = _jwtTokenGenerator.GenerateAccessToken(user, roles, permissions);
+        var newAccessToken = rolePerms.RoleIds != null && rolePerms.RoleIds.Count > 0
+            ? _jwtTokenGenerator.GenerateAccessToken(user, roles, permissions, rolePerms.RoleIds)
+            : _jwtTokenGenerator.GenerateAccessToken(user, roles, permissions);
         var newRefreshToken = _jwtTokenGenerator.GenerateRefreshToken();
 
         existingSession.IsRevoked = true;
