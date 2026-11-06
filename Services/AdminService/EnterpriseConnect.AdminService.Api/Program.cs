@@ -3,6 +3,8 @@ using EnterpriseConnect.AdminService.Api.Extensions;
 using EnterpriseConnect.AdminService.Api.Middleware;
 using EnterpriseConnect.AdminService.Application;
 using EnterpriseConnect.AdminService.Infrastructure;
+using EnterpriseConnect.BuildingBlocks.Infrastructure.Extensions;
+using EnterpriseConnect.BuildingBlocks.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
@@ -68,6 +70,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddControllers();
 builder.Services.AddAdminForwardedHeaders();
 builder.Services.AddAdminSwagger();
+builder.Services.AddEnterpriseHealthChecks();
 
 var app = builder.Build();
 
@@ -83,12 +86,14 @@ app.UseForwardedHeaders();
 app.UseCors();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseAdminSwagger(app.Environment);
+app.UseOriginShield();
 
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapEnterpriseHealthChecks();
 app.MapGet("/", () => Results.Ok("EnterpriseConnect AdminService is running..."));
 
 app.Run();

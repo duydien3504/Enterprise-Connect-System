@@ -1,4 +1,5 @@
 using EnterpriseConnect.BuildingBlocks.Infrastructure.Extensions;
+using EnterpriseConnect.BuildingBlocks.Infrastructure.Security;
 using EnterpriseConnect.IdentityService.Api.Authorization;
 using EnterpriseConnect.IdentityService.Api.Extensions;
 using EnterpriseConnect.IdentityService.Api.Middleware;
@@ -13,6 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddIdentityApplication();
 builder.Services.AddIdentityInfrastructure(builder.Configuration);
 builder.Services.AddDistributedAuditClient();
+builder.Services.AddEnterpriseHealthChecks();
 builder.Services.AddIdentityForwardedHeaders(builder.Configuration);
 builder.Services.AddIdentityCors();
 
@@ -31,6 +33,7 @@ if (args.Contains("--seed-only")) return;
 // 4. Request Pipeline
 app.UseForwardedHeaders();
 app.UseCors(CorsExtensions.PolicyName);
+app.UseOriginShield();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseIdentitySwagger(app.Environment);
 app.UseHttpsRedirection();
@@ -38,6 +41,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapEnterpriseHealthChecks();
 app.MapGet("/", () => Results.Ok("IdentityService Auth & Authorization is active!"));
 
 app.Run();

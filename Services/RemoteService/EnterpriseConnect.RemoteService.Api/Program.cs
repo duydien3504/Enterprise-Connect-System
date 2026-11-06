@@ -1,5 +1,6 @@
 using System.Text;
 using EnterpriseConnect.BuildingBlocks.Infrastructure.Extensions;
+using EnterpriseConnect.BuildingBlocks.Infrastructure.Security;
 using EnterpriseConnect.RemoteService.Api.Extensions;
 using EnterpriseConnect.RemoteService.Api.Hubs;
 using EnterpriseConnect.RemoteService.Api.Middleware;
@@ -16,6 +17,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRemoteApplication();
 builder.Services.AddRemoteInfrastructure(builder.Configuration);
 builder.Services.AddDistributedAuditClient();
+builder.Services.AddEnterpriseHealthChecks();
 
 // 2. JWT Authentication & SignalR Token Support
 var jwtKey = builder.Configuration["JwtSettings:Secret"] ?? "REDACTED_JWT_SECRET";
@@ -89,6 +91,7 @@ using (var scope = app.Services.CreateScope())
 // 5. Request Pipeline
 app.UseForwardedHeaders();
 app.UseCors();
+app.UseOriginShield();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseRemoteSwagger(app.Environment);
 
@@ -98,6 +101,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<RemoteHub>("/hubs/remote");
+app.MapEnterpriseHealthChecks();
 
 app.MapGet("/", () => Results.Ok("EnterpriseConnect RemoteService & RemoteHub is running..."));
 

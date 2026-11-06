@@ -1,5 +1,6 @@
 using EnterpriseConnect.ApiGateway.Extensions;
 using EnterpriseConnect.ApiGateway.Services;
+using Yarp.ReverseProxy.Transforms;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,9 +10,22 @@ builder.Services.AddGatewayRateLimiting();
 builder.Services.AddGatewayAuth(builder.Configuration);
 builder.Services.AddGatewaySwagger();
 
-// 2. YARP Reverse Proxy
+// 2. YARP Reverse Proxy with Origin Shield Secret Injection
 builder.Services.AddReverseProxy()
-    .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
+    .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
+    .AddTransforms(builderContext =>
+    {
+        var secret = builder.Configuration["Security:GatewaySharedSecret"] 
+            ?? Environment.GetEnvironmentVariable("GATEWAY_SHARED_SECRET");
+        if (!string.IsNullOrWhiteSpace(secret))
+        {
+            builderContext.AddRequestTransform(transformContext =>
+            {
+                transformContext.ProxyRequest.Headers.TryAddWithoutValidation("X-Gateway-Secret", secret);
+                return ValueTask.CompletedTask;
+            });
+        }
+    });
 
 var app = builder.Build();
 
@@ -28,13 +42,12 @@ app.UseAuthorization();
 // 4. Endpoints & Proxy Mapping
 app.MapGet("/", () => Results.Ok(new
 {
-    service = "EnterpriseConnect.ApiGateway",
-    status = "Healthy",
-    timestamp = DateTimeOffset.UtcNow,
-    engine = "YARP 2.3.0",
-    swagger = "/swagger"
+    service = "EnterpriseConnect.ApiGateway", status = "Healthy",
+    timestamp = DateTimeOffset.UtcNow, engine = "YARP 2.3.0", swagger = "/swagger"
 }));
-app.MapGet("/health", () => Results.Ok("Healthy"));
+app.MapGet("/health", () => Results.Ok(new { status = "Healthy", timestamp = DateTimeOffset.UtcNow }));
+app.MapGet("/health/live", () => Results.Ok(new { status = "Healthy", timestamp = DateTimeOffset.UtcNow }));
+app.MapGet("/health/ready", () => Results.Ok(new { status = "Healthy", timestamp = DateTimeOffset.UtcNow }));
 app.MapGet("/swagger/unified/swagger.json", async (UnifiedSwaggerService service, CancellationToken ct) =>
     Results.Content(await service.GetUnifiedSwaggerJsonAsync(ct), "application/json"));
 app.MapReverseProxy();

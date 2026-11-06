@@ -1,0 +1,13 @@
+**/.git
+**/.github
+**/.vs
+**/.vscode
+**/.idea
+**/bin/
+**/obj/
+**/out/
+Tests/
+TestResults/
+*.md
+*.log
+.gemini/
