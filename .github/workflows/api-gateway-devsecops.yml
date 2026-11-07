@@ -122,17 +122,17 @@ jobs:
             sudo docker run -d \
               --name enterpriseconnect-api-gateway \
               --restart unless-stopped \
-              -p 80:8080 \
+              -p 127.0.0.1:8080:8080 \
               --env-file /opt/enterpriseconnect/gateway/.env \
               enterpriseconnect-gateway:latest
 
             sleep 5
             echo ">>> Running Smoke Test verification on Gateway..."
-            curl -f -s http://localhost/health/live || exit 1
+            curl -f -s http://127.0.0.1:8080/health/live || exit 1
             echo ">>> Verifying Downstream Reverse Proxy Routing to 5 Microservices..."
-            echo "1. Identity Service: $(curl -s http://localhost/identity/health/live | cut -c 1-60)..."
-            echo "2. Messaging Service: $(curl -s http://localhost/messaging/health/live | cut -c 1-60)..."
-            echo "3. Media Service: $(curl -s http://localhost/media/health/live | cut -c 1-60)..."
-            echo "4. Remote Service: $(curl -s http://localhost/remote/health/live | cut -c 1-60)..."
-            echo "5. Admin Service: $(curl -s http://localhost/admin/health/live | cut -c 1-60)..."
+            echo "1. Identity Service: $(curl -s http://127.0.0.1:8080/identity/health/live | cut -c 1-60)..."
+            echo "2. Messaging Service: $(curl -s http://127.0.0.1:8080/messaging/health/live | cut -c 1-60)..."
+            echo "3. Media Service: $(curl -s http://127.0.0.1:8080/media/health/live | cut -c 1-60)..."
+            echo "4. Remote Service: $(curl -s http://127.0.0.1:8080/remote/health/live | cut -c 1-60)..."
+            echo "5. Admin Service: $(curl -s http://127.0.0.1:8080/admin/health/live | cut -c 1-60)..."
             echo "Deployment to AWS EC2 and End-to-End Routing completed successfully!"
