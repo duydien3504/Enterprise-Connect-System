@@ -33,5 +33,10 @@ launchSettings.json
 Thumbs.db
 .DS_Store
 
+## Node.js & Frontend Artifacts
+node_modules/
+dist/
+.env.local
+
 
 Docs
