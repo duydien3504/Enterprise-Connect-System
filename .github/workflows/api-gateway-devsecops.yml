@@ -78,9 +78,9 @@ jobs:
       - name: Deploy to AWS EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.EC2_HOST || '3.24.182.239' }}
-          username: ${{ secrets.EC2_USERNAME || 'ubuntu' }}
-          key: ${{ secrets.EC2_SSH_KEY || secrets.AWS_ENTERPRISE_CONNECTION_SECRET }}
+          host: 3.24.182.239
+          username: ubuntu
+          key: ${{ secrets.AWS_ENTERPRISE_CONNECTION_SECRET }}
           script_stop: true
           script: |
             echo ">>> [1/4] Pulling latest changes from repository..."
@@ -92,9 +92,9 @@ jobs:
             sudo bash -c 'cat << "ENV_EOF" > /opt/enterpriseconnect/gateway/.env
             ASPNETCORE_ENVIRONMENT=Production
             ASPNETCORE_HTTP_PORTS=8080
-            GATEWAY_SHARED_SECRET=${{ secrets.GATEWAY_SHARED_SECRET || 'REDACTED_GATEWAY_SECRET' }}
-            Security__GatewaySharedSecret=${{ secrets.GATEWAY_SHARED_SECRET || 'REDACTED_GATEWAY_SECRET' }}
-            JwtSettings__Secret=${{ secrets.JWT_SECRET || 'REDACTED_JWT_SECRET' }}
+            GATEWAY_SHARED_SECRET=REDACTED_GATEWAY_SECRET
+            Security__GatewaySharedSecret=REDACTED_GATEWAY_SECRET
+            JwtSettings__Secret=REDACTED_JWT_SECRET
             ENV_EOF'
             sudo chmod 600 /opt/enterpriseconnect/gateway/.env
 
