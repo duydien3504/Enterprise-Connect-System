@@ -13,8 +13,13 @@ public static class DatabaseExtensions
         string connectionStringName,
         string? migrationsAssembly = null) where TContext : DbContext
     {
-        var connectionString = configuration.GetConnectionString(connectionStringName)
+        var rawConn = configuration.GetConnectionString(connectionStringName)
+            ?? configuration[$"ConnectionStrings:{connectionStringName}"]
+            ?? configuration[connectionStringName]
+            ?? configuration["DATABASE_URL"]
             ?? throw new InvalidOperationException($"Connection string '{connectionStringName}' not found.");
+
+        var connectionString = NormalizePostgresConnectionString(rawConn);
 
         services.AddDbContext<TContext>((serviceProvider, options) =>
         {
@@ -48,5 +53,28 @@ public static class DatabaseExtensions
         services.AddScoped(typeof(IReadRepository<>), typeof(Persistence.EfRepository<>));
 
         return services;
+    }
+
+    private static string NormalizePostgresConnectionString(string connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            return connectionString;
+        }
+
+        if (connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase) ||
+            connectionString.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase))
+        {
+            var uri = new Uri(connectionString);
+            var userInfo = uri.UserInfo.Split(':');
+            var username = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : string.Empty;
+            var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : string.Empty;
+            var database = uri.AbsolutePath.TrimStart('/');
+            var port = uri.Port > 0 ? uri.Port : 5432;
+
+            return $"Host={uri.Host};Port={port};Database={database};Username={username};Password={password};Include Error Detail=true;";
+        }
+
+        return connectionString;
     }
 }
