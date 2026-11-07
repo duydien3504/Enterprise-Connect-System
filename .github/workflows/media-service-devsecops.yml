@@ -54,7 +54,7 @@ jobs:
       - name: Build & Run Unit Tests
         run: |
           dotnet build Services/MediaService/EnterpriseConnect.MediaService.Api/EnterpriseConnect.MediaService.Api.csproj -c Release
-          dotnet test Tests/Services/MediaService/EnterpriseConnect.MediaService.UnitTests/EnterpriseConnect.MediaService.UnitTests.csproj -c Release --no-build
+          dotnet test Tests/Services/MediaService/EnterpriseConnect.MediaService.UnitTests/EnterpriseConnect.MediaService.UnitTests.csproj -c Release
 
       # 5. Build Hardened Docker Container
       - name: Build Docker Image

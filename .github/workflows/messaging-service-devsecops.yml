@@ -54,7 +54,7 @@ jobs:
       - name: Build & Run Unit Tests
         run: |
           dotnet build Services/MessagingService/EnterpriseConnect.MessagingService.Api/EnterpriseConnect.MessagingService.Api.csproj -c Release
-          dotnet test Tests/Services/MessagingService/EnterpriseConnect.MessagingService.UnitTests/EnterpriseConnect.MessagingService.UnitTests.csproj -c Release --no-build
+          dotnet test Tests/Services/MessagingService/EnterpriseConnect.MessagingService.UnitTests/EnterpriseConnect.MessagingService.UnitTests.csproj -c Release
 
       # 5. Build Hardened Docker Container
       - name: Build Docker Image

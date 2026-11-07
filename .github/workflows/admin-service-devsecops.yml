@@ -54,7 +54,7 @@ jobs:
       - name: Build & Run Unit Tests
         run: |
           dotnet build Services/AdminService/EnterpriseConnect.AdminService.Api/EnterpriseConnect.AdminService.Api.csproj -c Release
-          dotnet test Tests/Services/AdminService/EnterpriseConnect.AdminService.UnitTests/EnterpriseConnect.AdminService.UnitTests.csproj -c Release --no-build
+          dotnet test Tests/Services/AdminService/EnterpriseConnect.AdminService.UnitTests/EnterpriseConnect.AdminService.UnitTests.csproj -c Release
 
       # 5. Build Hardened Docker Container
       - name: Build Docker Image

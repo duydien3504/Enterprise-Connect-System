@@ -54,7 +54,7 @@ jobs:
       - name: Build & Run Unit Tests
         run: |
           dotnet build Services/RemoteService/EnterpriseConnect.RemoteService.Api/EnterpriseConnect.RemoteService.Api.csproj -c Release
-          dotnet test Tests/Services/RemoteService/EnterpriseConnect.RemoteService.UnitTests/EnterpriseConnect.RemoteService.UnitTests.csproj -c Release --no-build
+          dotnet test Tests/Services/RemoteService/EnterpriseConnect.RemoteService.UnitTests/EnterpriseConnect.RemoteService.UnitTests.csproj -c Release
 
       # 5. Build Hardened Docker Container
       - name: Build Docker Image
