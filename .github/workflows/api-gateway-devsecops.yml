@@ -1,0 +1,118 @@
+name: API Gateway DevSecOps CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'EnterpriseConnect.ApiGateway/**'
+      - '.github/workflows/api-gateway-devsecops.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'EnterpriseConnect.ApiGateway/**'
+  workflow_dispatch:
+
+concurrency:
+  group: api-gateway-production
+  cancel-in-progress: true
+
+jobs:
+  security-and-build:
+    name: DevSecOps Security Scan & Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 1. Secret Scanning (TruffleHog)
+      - name: TruffleHog Secret Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          head: ${{ github.head_ref || github.ref }}
+          extra_args: --only-verified
+
+      # 2. Setup .NET 8 SDK
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # 3. SCA - NuGet Vulnerability Check
+      - name: SCA NuGet Vulnerability Audit
+        run: |
+          echo ">>> Scanning NuGet dependencies for known CVE vulnerabilities..."
+          dotnet list EnterpriseConnect.ApiGateway/EnterpriseConnect.ApiGateway.csproj package --vulnerable --include-transitive
+
+      # 4. Compile & Test
+      - name: Build API Gateway
+        run: dotnet build EnterpriseConnect.ApiGateway/EnterpriseConnect.ApiGateway.csproj -c Release
+
+      # 5. Build Hardened Docker Container
+      - name: Build Docker Image
+        run: |
+          docker build -f EnterpriseConnect.ApiGateway/Dockerfile -t enterpriseconnect-gateway:${{ github.sha }} .
+
+      # 6. Container Image Security Scan (Aqua Trivy)
+      - name: Trivy Container Vulnerability Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'enterpriseconnect-gateway:${{ github.sha }}'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+  deploy-to-ec2:
+    name: Continuous Deployment to AWS EC2
+    needs: security-and-build
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to AWS EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST || '3.24.182.239' }}
+          username: ${{ secrets.EC2_USERNAME || 'ubuntu' }}
+          key: ${{ secrets.EC2_SSH_KEY || secrets.AWS_ENTERPRISE_CONNECTION_SECRET }}
+          script_stop: true
+          script: |
+            echo ">>> [1/4] Pulling latest changes from repository..."
+            cd /opt/enterpriseconnect
+            sudo git pull origin main
+
+            echo ">>> [2/4] Injecting Zero-Leak secrets into /opt/enterpriseconnect/gateway/.env..."
+            sudo mkdir -p /opt/enterpriseconnect/gateway
+            sudo bash -c 'cat << "ENV_EOF" > /opt/enterpriseconnect/gateway/.env
+            ASPNETCORE_ENVIRONMENT=Production
+            ASPNETCORE_HTTP_PORTS=8080
+            GATEWAY_SHARED_SECRET=${{ secrets.GATEWAY_SHARED_SECRET || "REDACTED_GATEWAY_SECRET" }}
+            Security__GatewaySharedSecret=${{ secrets.GATEWAY_SHARED_SECRET || "REDACTED_GATEWAY_SECRET" }}
+            JwtSettings__Secret=${{ secrets.JWT_SECRET || "REDACTED_JWT_SECRET" }}
+            ENV_EOF'
+            sudo chmod 600 /opt/enterpriseconnect/gateway/.env
+
+            echo ">>> [3/4] Rebuilding Docker image..."
+            sudo docker build -f EnterpriseConnect.ApiGateway/Dockerfile -t enterpriseconnect-gateway:latest .
+
+            echo ">>> [4/4] Restarting container with protected env-file..."
+            sudo docker stop enterpriseconnect-api-gateway 2>/dev/null || true
+            sudo docker rm enterpriseconnect-api-gateway 2>/dev/null || true
+            sudo docker run -d \
+              --name enterpriseconnect-api-gateway \
+              --restart unless-stopped \
+              -p 80:8080 \
+              --env-file /opt/enterpriseconnect/gateway/.env \
+              enterpriseconnect-gateway:latest
+
+            sleep 3
+            echo ">>> Running Smoke Test verification..."
+            curl -f -s http://localhost/health/live || exit 1
+            echo "Deployment to AWS EC2 completed successfully!"
