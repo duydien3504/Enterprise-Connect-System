@@ -75,6 +75,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Validate SSH Key Secret
+        run: |
+          if [ -z "$SSH_KEY_VAL" ]; then
+            echo "::error::Secret 'AWS_ENTERPRISE_CONNECTION_SECRET' is completely EMPTY or NOT FOUND in GitHub Secrets!"
+            exit 1
+          fi
+          echo "Secret is detected. Length: ${#SSH_KEY_VAL} characters."
+          HEADER=$(echo "$SSH_KEY_VAL" | head -n 1)
+          FOOTER=$(echo "$SSH_KEY_VAL" | tail -n 1)
+          echo "Header line: ${HEADER:0:35}"
+          echo "Footer line: ${FOOTER: -35}"
+          if [[ "$HEADER" != *"BEGIN"* ]]; then
+            echo "::error::Khóa SSH phải bắt đầu bằng '-----BEGIN ... PRIVATE KEY-----'. Giá trị hiện tại bắt đầu bằng: $HEADER"
+            exit 1
+          fi
+        env:
+          SSH_KEY_VAL: ${{ secrets.AWS_ENTERPRISE_CONNECTION_SECRET }}
+
       - name: Deploy to AWS EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
