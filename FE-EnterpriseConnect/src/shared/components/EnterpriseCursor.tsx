@@ -35,8 +35,8 @@ export const EnterpriseCursor: React.FC = () => {
     // Spring trailing animation
     const followCursor = () => {
       setTrailPos((prev) => ({
-        x: prev.x + (pos.x - prev.x) * 0.25,
-        y: prev.y + (pos.y - prev.y) * 0.25,
+        x: prev.x + (pos.x - prev.x) * 0.22,
+        y: prev.y + (pos.y - prev.y) * 0.22,
       }));
       animId = requestAnimationFrame(followCursor);
     };
@@ -54,12 +54,12 @@ export const EnterpriseCursor: React.FC = () => {
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[9999] overflow-hidden select-none">
-      {/* 1. Trailing Ambient Soft Glow Halo */}
+      {/* 1. Trailing Magnetic Halo Ring */}
       <div
-        className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-300 ease-out ${
+        className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border transition-all duration-300 ease-out ${
           isHovered
-            ? 'h-12 w-12 bg-sky-400/25 blur-md scale-125'
-            : 'h-6 w-6 bg-sky-400/15 blur-sm scale-100'
+            ? 'h-11 w-11 border-white bg-sky-400/20 shadow-[0_0_20px_rgba(56,189,248,0.7)] scale-110'
+            : 'h-8 w-8 border-sky-300/80 bg-sky-400/10 shadow-[0_0_12px_rgba(56,189,248,0.4)] scale-100'
         }`}
         style={{
           left: `${trailPos.x}px`,
@@ -67,38 +67,16 @@ export const EnterpriseCursor: React.FC = () => {
         }}
       />
 
-      {/* 2. Sleek Minimalist Designer SVG Cursor Pointer */}
+      {/* 2. Precision Center Dot Pointer */}
       <div
-        className="absolute transition-transform duration-75"
+        className="absolute -translate-x-1/2 -translate-y-1/2 transition-transform duration-75"
         style={{
           left: `${pos.x}px`,
           top: `${pos.y}px`,
-          transform: isHovered ? 'scale(1.15) translate(-2px, -2px)' : 'scale(1)',
+          transform: isHovered ? 'scale(1.3)' : 'scale(1)',
         }}
       >
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="drop-shadow-[0_2px_8px_rgba(2,132,199,0.5)]"
-        >
-          {/* Outer Sleek Arrow */}
-          <path
-            d="M3 3L10.5 21L13.5 13.5L21 10.5L3 3Z"
-            fill="url(#cursorGradient)"
-            stroke="#ffffff"
-            strokeWidth="1.5"
-            strokeLinejoin="round"
-          />
-          <defs>
-            <linearGradient id="cursorGradient" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#0284c7" />
-              <stop offset="1" stopColor="#38bdf8" />
-            </linearGradient>
-          </defs>
-        </svg>
+        <div className="h-2.5 w-2.5 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.9),0_0_2px_#0284c7] border border-sky-400" />
       </div>
     </div>
   );
