@@ -40,26 +40,26 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-sky-950/60 backdrop-blur-md animate-in fade-in duration-200 cursor-default">
-      <div className="relative w-full max-w-md rounded-3xl bg-white/95 backdrop-blur-2xl border border-white p-8 shadow-2xl shadow-sky-900/40 transform transition-all cursor-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#071e3d]/85 backdrop-blur-md animate-in fade-in duration-150 cursor-default">
+      <div className="relative w-full max-w-md rounded-2xl bg-white border border-[#0052cc] p-8 shadow-2xl shadow-black/60 transform transition-all cursor-auto">
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+          className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
 
         {/* Modal Header */}
         <div className="flex items-center gap-3.5 mb-6">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-sky-500 flex items-center justify-center text-white shadow-lg shadow-sky-500/30">
+          <div className="w-11 h-11 rounded-xl bg-[#0052cc] flex items-center justify-center text-white shadow-md">
             <Lock className="w-5 h-5" />
           </div>
           <div>
             <h2 className="text-xl font-bold text-slate-900">Đăng Nhập Hệ Thống</h2>
             <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Xác thực an toàn qua API Gateway</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-[#0052cc]" />
+              <span>Xác thực an toàn qua EnterpriseConnect Gateway</span>
             </p>
           </div>
         </div>
@@ -75,7 +75,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
             onChange={(e) => setEmail(e.target.value)}
             icon={<Mail className="w-4 h-4" />}
             required
-            className="bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500/20"
+            className="bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-[#0052cc]"
           />
 
           <Input
@@ -87,7 +87,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
             onChange={(e) => setPassword(e.target.value)}
             icon={<Lock className="w-4 h-4" />}
             required
-            className="bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-sky-500 focus:ring-sky-500/20"
+            className="bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus:border-[#0052cc]"
           />
 
           {error && (
@@ -98,18 +98,19 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
 
           <div className="flex items-center justify-between text-xs pt-1">
             <label className="flex items-center gap-2 cursor-pointer text-slate-600 select-none">
-              <input type="checkbox" defaultChecked className="rounded border-slate-300 text-sky-600 focus:ring-sky-500" />
+              <input type="checkbox" defaultChecked className="rounded border-slate-300 text-[#0052cc] focus:ring-[#0052cc]" />
               <span>Ghi nhớ phiên</span>
             </label>
-            <a href="#forgot" className="text-sky-600 hover:underline font-medium">
+            <a href="#forgot" className="text-[#0052cc] hover:underline font-medium">
               Quên mật khẩu?
             </a>
           </div>
 
+          {/* Solid Blue Button - NO GRADIENT */}
           <Button
             type="submit"
             size="lg"
-            className="w-full mt-2 rounded-xl bg-gradient-to-r from-blue-600 via-sky-600 to-cyan-500 hover:from-blue-500 hover:via-sky-500 hover:to-cyan-400 text-white font-bold shadow-lg shadow-sky-500/30 border-0"
+            className="w-full mt-2 rounded-xl bg-[#0052cc] hover:bg-[#0065ff] active:bg-[#0747a6] text-white font-bold shadow-md border-0"
             isLoading={isLoading}
           >
             <span>Vào Hệ Thống</span>
