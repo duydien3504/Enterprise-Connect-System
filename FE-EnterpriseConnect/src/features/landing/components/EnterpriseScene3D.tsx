@@ -43,8 +43,8 @@ export const EnterpriseScene3D: React.FC = () => {
     rimLight.position.set(15, 20, 15);
     scene.add(rimLight);
 
-    // 3. 3D Enterprise Node Mesh (Mạng Lưới Liên Kết Doanh Nghiệp)
-    const nodeCount = 85;
+    // 3. 3D Enterprise Node Mesh (Mạng Lưới Liên Kết Doanh Nghiệp Tối Ưu Cao Độ)
+    const nodeCount = 55;
     const nodePositions: THREE.Vector3[] = [];
     const nodeVelocities: THREE.Vector3[] = [];
 
@@ -61,9 +61,9 @@ export const EnterpriseScene3D: React.FC = () => {
       nodePositions.push(new THREE.Vector3(x, y, z));
       nodeVelocities.push(
         new THREE.Vector3(
-          (Math.random() - 0.5) * 0.012,
-          (Math.random() - 0.5) * 0.012,
-          (Math.random() - 0.5) * 0.012
+          (Math.random() - 0.5) * 0.015,
+          (Math.random() - 0.5) * 0.015,
+          (Math.random() - 0.5) * 0.015
         )
       );
     }
@@ -240,37 +240,43 @@ export const EnterpriseScene3D: React.FC = () => {
       }
       nodeMesh.instanceMatrix.needsUpdate = true;
 
-      // Update connecting lines dynamically
+      // Update connecting lines dynamically with zero memory allocations & fast squared distance
       let lineIndex = 0;
-      const connectionDist = 4.8;
+      const connectionDistSq = 5.2 * 5.2;
       const posArray = lineGeo.attributes.position.array as Float32Array;
       const colArray = lineGeo.attributes.color.array as Float32Array;
 
-      // Solid color stops (Pure Blue and Cyan, NO gradients)
-      const c1 = new THREE.Color(0x0052cc);
-      const c2 = new THREE.Color(0x38bdf8);
+      // Solid color constants (Zero GC allocations per frame)
+      const r1 = 0.0, g1 = 0.32, b1 = 0.8;    // #0052cc
+      const r2 = 0.22, g2 = 0.74, b2 = 0.97;  // #38bdf8
 
       for (let i = 0; i < nodeCount && lineIndex < maxConnections; i++) {
+        const p1 = nodePositions[i];
         for (let j = i + 1; j < nodeCount && lineIndex < maxConnections; j++) {
-          const d = nodePositions[i].distanceTo(nodePositions[j]);
-          if (d < connectionDist) {
+          const p2 = nodePositions[j];
+          const dx = p1.x - p2.x;
+          const dy = p1.y - p2.y;
+          const dz = p1.z - p2.z;
+          const dSq = dx * dx + dy * dy + dz * dz;
+
+          if (dSq < connectionDistSq) {
             const idx = lineIndex * 6;
 
-            posArray[idx] = nodePositions[i].x;
-            posArray[idx + 1] = nodePositions[i].y;
-            posArray[idx + 2] = nodePositions[i].z;
+            posArray[idx] = p1.x;
+            posArray[idx + 1] = p1.y;
+            posArray[idx + 2] = p1.z;
 
-            posArray[idx + 3] = nodePositions[j].x;
-            posArray[idx + 4] = nodePositions[j].y;
-            posArray[idx + 5] = nodePositions[j].z;
+            posArray[idx + 3] = p2.x;
+            posArray[idx + 4] = p2.y;
+            posArray[idx + 5] = p2.z;
 
-            colArray[idx] = c1.r;
-            colArray[idx + 1] = c1.g;
-            colArray[idx + 2] = c1.b;
+            colArray[idx] = r1;
+            colArray[idx + 1] = g1;
+            colArray[idx + 2] = b1;
 
-            colArray[idx + 3] = c2.r;
-            colArray[idx + 4] = c2.g;
-            colArray[idx + 5] = c2.b;
+            colArray[idx + 3] = r2;
+            colArray[idx + 4] = g2;
+            colArray[idx + 5] = b2;
 
             lineIndex++;
           }
@@ -281,7 +287,7 @@ export const EnterpriseScene3D: React.FC = () => {
       lineGeo.attributes.position.needsUpdate = true;
       lineGeo.attributes.color.needsUpdate = true;
 
-      // Update data packet positions
+      // Update data packet positions (Zero vector clones per frame)
       const pArr = packetGeo.attributes.position.array as Float32Array;
       packetRoutes.forEach((route, pIdx) => {
         route.progress += route.speed;
@@ -293,11 +299,11 @@ export const EnterpriseScene3D: React.FC = () => {
 
         const pA = nodePositions[route.from];
         const pB = nodePositions[route.to];
-        const currentP = pA.clone().lerp(pB, route.progress);
+        const prog = route.progress;
 
-        pArr[pIdx * 3] = currentP.x;
-        pArr[pIdx * 3 + 1] = currentP.y;
-        pArr[pIdx * 3 + 2] = currentP.z;
+        pArr[pIdx * 3] = pA.x + (pB.x - pA.x) * prog;
+        pArr[pIdx * 3 + 1] = pA.y + (pB.y - pA.y) * prog;
+        pArr[pIdx * 3 + 2] = pA.z + (pB.z - pA.z) * prog;
       });
       packetGeo.attributes.position.needsUpdate = true;
 

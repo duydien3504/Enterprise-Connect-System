@@ -10,8 +10,8 @@ interface LandingHero3DProps {
 
 export const LandingHero3D: React.FC<LandingHero3DProps> = ({ onOpenLogin }) => {
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-[#071e3d] font-['Plus_Jakarta_Sans',sans-serif] text-white select-none cursor-none flex flex-col justify-between">
-      {/* 1. Custom Magnetic Precision Designer Cursor */}
+    <div className="relative min-h-screen w-full overflow-hidden bg-[#071e3d] font-['Plus_Jakarta_Sans',sans-serif] text-white select-none cursor-default flex flex-col justify-between">
+      {/* 1. Custom Magnetic Precision Designer Halo (0ms lag, direct GPU transform) */}
       <EnterpriseCursor />
 
       {/* 2. Full-Page 3D WebGL Enterprise Node Mesh Canvas */}
