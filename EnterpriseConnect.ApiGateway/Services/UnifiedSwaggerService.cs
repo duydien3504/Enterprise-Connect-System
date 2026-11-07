@@ -5,12 +5,14 @@ using System.Text.Json.Nodes;
 public class UnifiedSwaggerService
 {
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IConfiguration _config;
     private static string? _cachedJson;
     private static DateTimeOffset _cacheExpiry = DateTimeOffset.MinValue;
 
-    public UnifiedSwaggerService(IHttpClientFactory httpClientFactory)
+    public UnifiedSwaggerService(IHttpClientFactory httpClientFactory, IConfiguration config)
     {
         _httpClientFactory = httpClientFactory;
+        _config = config;
     }
 
     public async Task<string> GetUnifiedSwaggerJsonAsync(CancellationToken cancellationToken = default)
@@ -23,13 +25,25 @@ public class UnifiedSwaggerService
         var client = _httpClientFactory.CreateClient();
         client.Timeout = TimeSpan.FromSeconds(3);
 
+        var secret = _config["Security:GatewaySharedSecret"] ?? Environment.GetEnvironmentVariable("GATEWAY_SHARED_SECRET");
+        if (!string.IsNullOrWhiteSpace(secret))
+        {
+            client.DefaultRequestHeaders.TryAddWithoutValidation("X-Gateway-Secret", secret);
+        }
+
+        var idUrl = _config["ReverseProxy:Clusters:identity-cluster:Destinations:identity-service:Address"] ?? "http://localhost:5223";
+        var msgUrl = _config["ReverseProxy:Clusters:messaging-cluster:Destinations:messaging-service:Address"] ?? "http://localhost:5166";
+        var medUrl = _config["ReverseProxy:Clusters:media-cluster:Destinations:media-service:Address"] ?? "http://localhost:5116";
+        var remUrl = _config["ReverseProxy:Clusters:remote-cluster:Destinations:remote-service:Address"] ?? "http://localhost:5210";
+        var admUrl = _config["ReverseProxy:Clusters:admin-cluster:Destinations:admin-service:Address"] ?? "http://localhost:5298";
+
         var endpoints = new[]
         {
-            "http://localhost:5223/swagger/v1/swagger.json",
-            "http://localhost:5166/swagger/v1/swagger.json",
-            "http://localhost:5116/swagger/v1/swagger.json",
-            "http://localhost:5210/swagger/v1/swagger.json",
-            "http://localhost:5298/swagger/v1/swagger.json"
+            $"{idUrl.TrimEnd('/')}/swagger/v1/swagger.json",
+            $"{msgUrl.TrimEnd('/')}/swagger/v1/swagger.json",
+            $"{medUrl.TrimEnd('/')}/swagger/v1/swagger.json",
+            $"{remUrl.TrimEnd('/')}/swagger/v1/swagger.json",
+            $"{admUrl.TrimEnd('/')}/swagger/v1/swagger.json"
         };
 
         var root = new JsonObject

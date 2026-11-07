@@ -1,12 +1,10 @@
 # Ignore Sensitive Configurations & Keys
-appsettings.json
-appsettings.*.json
-!appsettings.Example.json
-!appsettings.Template.json
-*.env
-*.env.*
+appsettings.Development.json
+appsettings.Local.json
 *.local.json
 secrets.json
+*.env
+*.env.*
 
 # Ignore build artifacts
 [Bb]in/
