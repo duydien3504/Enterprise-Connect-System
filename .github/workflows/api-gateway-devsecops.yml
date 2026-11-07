@@ -34,7 +34,7 @@ jobs:
       - name: TruffleHog Secret Scan
         uses: trufflesecurity/trufflehog@main
         with:
-          head: ${{ github.head_ref || github.ref }}
+          path: ./EnterpriseConnect.ApiGateway
           extra_args: --only-verified
 
       # 2. Setup .NET 8 SDK

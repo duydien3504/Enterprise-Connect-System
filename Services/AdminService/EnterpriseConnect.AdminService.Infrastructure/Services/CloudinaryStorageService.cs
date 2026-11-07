@@ -14,9 +14,9 @@ public class CloudinaryStorageService : ICloudinaryStorageService
     public CloudinaryStorageService(IConfiguration configuration, ILogger<CloudinaryStorageService> logger)
     {
         _logger = logger;
-        var cloudName = configuration["CloudinarySettings:CloudName"] ?? "REDACTED_CLOUD_NAME";
-        var apiKey = configuration["CloudinarySettings:ApiKey"] ?? "REDACTED_CLOUDINARY_KEY";
-        var apiSecret = configuration["CloudinarySettings:ApiSecret"] ?? "REDACTED_CLOUDINARY_SECRET";
+        var cloudName = configuration["CloudinarySettings:CloudName"] ?? string.Empty;
+        var apiKey = configuration["CloudinarySettings:ApiKey"] ?? string.Empty;
+        var apiSecret = configuration["CloudinarySettings:ApiSecret"] ?? string.Empty;
 
         var account = new Account(cloudName, apiKey, apiSecret);
         _cloudinary = new Cloudinary(account) { Api = { Secure = true } };
