@@ -80,7 +80,14 @@ builder.Services.AddMediaSwagger();
 
 var app = builder.Build();
 
-// 4. Request Pipeline
+// 4. Auto-migration
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<EnterpriseConnect.MediaService.Infrastructure.Persistence.Context.MediaDbContext>();
+    Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.Migrate(dbContext.Database);
+}
+
+// 5. Request Pipeline
 app.UseForwardedHeaders();
 app.UseCors();
 app.UseOriginShield();
