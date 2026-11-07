@@ -1,0 +1,96 @@
+name: Identity Service DevSecOps CI/CD
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'Services/IdentityService/**'
+      - 'BuildingBlocks/**'
+      - '.github/workflows/identity-service-devsecops.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'Services/IdentityService/**'
+      - 'BuildingBlocks/**'
+  workflow_dispatch:
+
+concurrency:
+  group: identity-service-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security-and-build:
+    name: DevSecOps Security Scan & Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 1. Secret Scanning (TruffleHog)
+      - name: TruffleHog Secret Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified --exclude-paths=.trufflehogignore
+
+      # 2. Setup .NET 8 SDK
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # 3. SCA - NuGet Vulnerability Check
+      - name: SCA NuGet Vulnerability Audit
+        run: |
+          echo ">>> Scanning NuGet dependencies for IdentityService..."
+          dotnet list Services/IdentityService/EnterpriseConnect.IdentityService.Api/EnterpriseConnect.IdentityService.Api.csproj package --vulnerable --include-transitive
+
+      # 4. Compile & Test
+      - name: Build & Run Unit Tests
+        run: |
+          dotnet build Services/IdentityService/EnterpriseConnect.IdentityService.Api/EnterpriseConnect.IdentityService.Api.csproj -c Release
+          dotnet test Tests/Services/IdentityService/EnterpriseConnect.IdentityService.UnitTests/EnterpriseConnect.IdentityService.UnitTests.csproj -c Release --no-build
+
+      # 5. Build Hardened Docker Container
+      - name: Build Docker Image
+        run: |
+          docker build -f Services/IdentityService/EnterpriseConnect.IdentityService.Api/Dockerfile -t enterpriseconnect-identity:${{ github.sha }} .
+
+      # 6. Container Image Security Scan (Aqua Trivy)
+      - name: Trivy Container Vulnerability Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'enterpriseconnect-identity:${{ github.sha }}'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+  promote-to-production:
+    name: Promote Verified Code to Production Branch
+    needs: security-and-build
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fast-forward Production Branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          echo ">>> Promoting verified commit ${{ github.sha }} to 'production' branch..."
+          git push origin ${{ github.sha }}:refs/heads/production --force-with-lease
+          echo ">>> Successfully promoted to production branch! Railway & Render will auto-deploy."
