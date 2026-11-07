@@ -23,7 +23,7 @@ public class UnifiedSwaggerService
         }
 
         var client = _httpClientFactory.CreateClient();
-        client.Timeout = TimeSpan.FromSeconds(3);
+        client.Timeout = TimeSpan.FromSeconds(10);
 
         var secret = _config["Security:GatewaySharedSecret"] ?? Environment.GetEnvironmentVariable("GATEWAY_SHARED_SECRET");
         if (!string.IsNullOrWhiteSpace(secret))
