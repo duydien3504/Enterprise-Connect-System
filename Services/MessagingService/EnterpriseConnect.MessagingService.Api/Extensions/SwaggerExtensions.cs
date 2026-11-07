@@ -45,29 +45,26 @@ public static class SwaggerExtensions
 
     public static IApplicationBuilder UseMessagingSwagger(this IApplicationBuilder app, IWebHostEnvironment environment)
     {
-        if (environment.IsDevelopment())
+        app.UseSwagger(c =>
         {
-            app.UseSwagger(c =>
+            c.SerializeAsV2 = true;
+            c.PreSerializeFilters.Add((swaggerDoc, httpReq) =>
             {
-                c.SerializeAsV2 = true;
-                c.PreSerializeFilters.Add((swaggerDoc, httpReq) =>
+                if (httpReq.Headers.TryGetValue("X-Forwarded-Prefix", out var prefix) && !string.IsNullOrEmpty(prefix))
                 {
-                    if (httpReq.Headers.TryGetValue("X-Forwarded-Prefix", out var prefix) && !string.IsNullOrEmpty(prefix))
+                    swaggerDoc.Servers = new List<OpenApiServer>
                     {
-                        swaggerDoc.Servers = new List<OpenApiServer>
-                        {
-                            new() { Url = prefix.ToString() }
-                        };
-                    }
-                });
+                        new() { Url = prefix.ToString() }
+                    };
+                }
             });
+        });
 
-            app.UseSwaggerUI(c =>
-            {
-                c.SwaggerEndpoint("/swagger/v1/swagger.json", "EnterpriseConnect Messaging API v1");
-                c.RoutePrefix = "swagger";
-            });
-        }
+        app.UseSwaggerUI(c =>
+        {
+            c.SwaggerEndpoint("/swagger/v1/swagger.json", "EnterpriseConnect Messaging API v1");
+            c.RoutePrefix = "swagger";
+        });
 
         return app;
     }
