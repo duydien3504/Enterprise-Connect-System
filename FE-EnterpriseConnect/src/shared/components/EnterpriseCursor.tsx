@@ -17,10 +17,21 @@ export const EnterpriseCursor: React.FC = () => {
 
       const target = e.target as HTMLElement | null;
       if (target) {
+        const isInputField =
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable;
+
+        if (isInputField) {
+          if (haloRef.current) haloRef.current.style.opacity = '0';
+          return;
+        }
+
+        if (haloRef.current) haloRef.current.style.opacity = '1';
+
         const isClickable =
           target.tagName === 'BUTTON' ||
           target.tagName === 'A' ||
-          target.tagName === 'INPUT' ||
           target.closest('button') ||
           target.closest('a') ||
           target.getAttribute('role') === 'button' ||
@@ -30,8 +41,8 @@ export const EnterpriseCursor: React.FC = () => {
           isHovered = Boolean(isClickable);
           if (haloRef.current) {
             if (isHovered) {
-              haloRef.current.style.width = '48px';
-              haloRef.current.style.height = '48px';
+              haloRef.current.style.width = '46px';
+              haloRef.current.style.height = '46px';
               haloRef.current.style.borderColor = '#38bdf8';
               haloRef.current.style.backgroundColor = 'rgba(0, 82, 204, 0.25)';
               haloRef.current.style.boxShadow = '0 0 20px rgba(56, 189, 248, 0.6)';
