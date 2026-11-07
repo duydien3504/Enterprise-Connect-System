@@ -6,13 +6,13 @@ import {
   Monitor,
   ShieldAlert,
   Server,
-  KeyRound,
   ExternalLink,
   CheckCircle2,
   XCircle,
   Radio,
   Send,
   LogOut,
+  Sparkles,
 } from 'lucide-react';
 import { ENV } from '@/core/config/env';
 import { signalRManager, type ConnectionState } from '@/core/signalr/signalRManager';
@@ -21,21 +21,21 @@ import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { Avatar } from '@/shared/components/Avatar';
 import { Badge } from '@/shared/components/Badge';
+import { LandingHero3D } from '@/features/landing/components/LandingHero3D';
+import { LoginModal } from '@/features/landing/components/LoginModal';
 
 export const App: React.FC = () => {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'contacts' | 'calls' | 'remote' | 'admin'>('chat');
   const [signalRState, setSignalRState] = useState<ConnectionState>('Disconnected');
-  const [email, setEmail] = useState('admin@enterprise.com');
-  const [password, setPassword] = useState('Password123!');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [loginLoading, setLoginLoading] = useState(false);
   const [gatewayStatus, setGatewayStatus] = useState<'checking' | 'healthy' | 'error'>('checking');
   const [messages, setMessages] = useState<Array<{ id: string; sender: string; text: string; time: string }>>([
     { id: '1', sender: 'System Gateway', text: 'Chào mừng bạn đến với EnterpriseConnect! API Gateway https://api.hugonef.id.vn đã sẵn sàng.', time: '10:00' },
   ]);
   const [inputMsg, setInputMsg] = useState('');
 
-  // Check Gateway Health on mount
+  // Check Gateway Health & Token on mount
   useEffect(() => {
     fetch(`${ENV.API_BASE_URL}/health/live`)
       .then((res) => (res.ok ? setGatewayStatus('healthy') : setGatewayStatus('error')))
@@ -44,37 +44,14 @@ export const App: React.FC = () => {
     const unsubscribe = signalRManager.subscribeState(setSignalRState);
     if (tokenStorage.getAccessToken()) {
       setIsLoggedIn(true);
+      signalRManager.connectChat().catch(() => {});
     }
     return () => unsubscribe();
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginLoading(true);
-    try {
-      const res = await fetch(`${ENV.API_BASE_URL}/api/Auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        tokenStorage.setAccessToken(data.accessToken);
-        setIsLoggedIn(true);
-        // Connect SignalR
-        try {
-          await signalRManager.connectChat();
-        } catch {
-          // Ignore if token needs auth
-        }
-      } else {
-        alert('Đăng nhập thất bại: Hãy kiểm tra thông tin tài khoản hoặc backend');
-      }
-    } catch {
-      alert('Không thể kết nối API Gateway');
-    } finally {
-      setLoginLoading(false);
-    }
+  const handleLoginSuccess = () => {
+    setIsLoggedIn(true);
+    signalRManager.connectChat().catch(() => {});
   };
 
   const handleLogout = () => {
@@ -87,7 +64,7 @@ export const App: React.FC = () => {
     if (!inputMsg.trim()) return;
     const newMsg = {
       id: Date.now().toString(),
-      sender: isLoggedIn ? 'Tôi' : 'Khách vãng lai',
+      sender: 'Tôi',
       text: inputMsg,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
@@ -95,6 +72,21 @@ export const App: React.FC = () => {
     setInputMsg('');
   };
 
+  // If NOT logged in, show the full 3D Landing Page
+  if (!isLoggedIn) {
+    return (
+      <>
+        <LandingHero3D onOpenLogin={() => setIsLoginModalOpen(true)} />
+        <LoginModal
+          isOpen={isLoginModalOpen}
+          onClose={() => setIsLoginModalOpen(false)}
+          onSuccess={handleLoginSuccess}
+        />
+      </>
+    );
+  }
+
+  // If logged in, show the Enterprise Workspace Portal
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-950 text-slate-100">
       {/* 1. App Left Sidebar */}
@@ -116,7 +108,7 @@ export const App: React.FC = () => {
                 key={id}
                 onClick={() => setActiveTab(id as typeof activeTab)}
                 title={label}
-                className={`flex h-11 w-11 items-center justify-center rounded-xl transition-all ${
+                className={`flex h-11 w-11 items-center justify-center rounded-xl transition-all cursor-pointer ${
                   activeTab === id
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
                     : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
@@ -129,22 +121,21 @@ export const App: React.FC = () => {
         </div>
 
         <div className="flex flex-col items-center gap-3">
-          <Avatar name="Enterprise User" size="md" status={isLoggedIn ? 'online' : 'offline'} />
+          <Avatar name="Enterprise User" size="md" status="online" />
         </div>
       </aside>
 
-      {/* 2. Main Content Area */}
+      {/* 2. Main Workspace Layout */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Header Bar */}
         <header className="flex h-16 items-center justify-between border-b border-slate-800 bg-slate-900/50 px-6 backdrop-blur-sm">
           <div className="flex items-center gap-3">
-            <h1 className="text-lg font-bold tracking-tight text-white">EnterpriseConnect Client</h1>
+            <h1 className="text-lg font-bold tracking-tight text-white">EnterpriseConnect Workspace</h1>
             <Badge variant="primary" className="font-mono text-[11px]">
-              React 19 + Vite + Tailwind
+              Active Session
             </Badge>
           </div>
 
-          {/* Connection Status & Swagger link */}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/90 px-3 py-1.5 text-xs">
               <Server className="h-3.5 w-3.5 text-indigo-400" />
@@ -181,34 +172,42 @@ export const App: React.FC = () => {
               rel="noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-300 hover:bg-indigo-500/20"
             >
-              <span>Swagger Unified API</span>
+              <span>Swagger API</span>
               <ExternalLink className="h-3 w-3" />
             </a>
 
-            {isLoggedIn && (
-              <Button variant="ghost" size="sm" onClick={handleLogout} title="Đăng xuất">
-                <LogOut className="h-4 w-4" />
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsLoggedIn(false)}
+              title="Xem Trang Chủ 3D"
+              className="text-xs"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-sky-400" />
+              <span>Xem Trang 3D</span>
+            </Button>
+
+            <Button variant="ghost" size="sm" onClick={handleLogout} title="Đăng xuất">
+              <LogOut className="h-4 w-4" />
+            </Button>
           </div>
         </header>
 
-        {/* Dynamic Body */}
+        {/* Workspace Body */}
         <main className="flex flex-1 overflow-hidden">
-          {/* Left Column: Conversations List or Feature List */}
+          {/* Left Column: Conversations */}
           <section className="w-80 border-r border-slate-800 bg-slate-900/30 p-4 flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
                 {activeTab === 'chat' && 'Cuộc hội thoại'}
-                {activeTab === 'contacts' && 'Danh bạ đồng nghiệp'}
-                {activeTab === 'calls' && 'Cuộc gọi gần đây'}
-                {activeTab === 'remote' && 'Phiên hỗ trợ từ xa'}
-                {activeTab === 'admin' && 'Phân hệ quản trị'}
+                {activeTab === 'contacts' && 'Danh bạ'}
+                {activeTab === 'calls' && 'Lịch sử cuộc gọi'}
+                {activeTab === 'remote' && 'Phiên hỗ trợ'}
+                {activeTab === 'admin' && 'Nhật ký bảo mật'}
               </h2>
               <Badge variant="neutral">5 Services Online</Badge>
             </div>
 
-            {/* Mock/Real conversation items */}
             <div className="flex-1 space-y-2 overflow-y-auto pr-1">
               {[
                 { name: 'Kênh Thông Báo Chung', last: 'EnterpriseConnect System is Live', time: '10:12', unread: 2 },
@@ -231,39 +230,10 @@ export const App: React.FC = () => {
                 </div>
               ))}
             </div>
-
-            {/* Quick Auth Box if not logged in */}
-            {!isLoggedIn && (
-              <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-3.5 space-y-3">
-                <div className="flex items-center gap-2 text-xs font-semibold text-indigo-300">
-                  <KeyRound className="h-4 w-4" />
-                  <span>Đăng nhập thử nghiệm (Identity Service)</span>
-                </div>
-                <form onSubmit={handleLogin} className="space-y-2.5">
-                  <Input
-                    placeholder="email@enterprise.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="text-xs py-1.5"
-                  />
-                  <Input
-                    type="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="text-xs py-1.5"
-                  />
-                  <Button type="submit" size="sm" className="w-full" isLoading={loginLoading}>
-                    Đăng nhập API Gateway
-                  </Button>
-                </form>
-              </div>
-            )}
           </section>
 
-          {/* Right Column: Interactive Chat Box */}
+          {/* Right Column: Chat Box */}
           <section className="flex flex-1 flex-col bg-slate-950">
-            {/* Chat Header */}
             <div className="flex h-14 items-center justify-between border-b border-slate-800/80 px-6 bg-slate-900/20">
               <div className="flex items-center gap-3">
                 <Avatar name="Kênh Thông Báo Chung" size="sm" status="online" />
@@ -277,7 +247,6 @@ export const App: React.FC = () => {
               </div>
             </div>
 
-            {/* Messages Feed */}
             <div className="flex-1 space-y-4 overflow-y-auto p-6">
               {messages.map((m) => (
                 <div
@@ -301,7 +270,6 @@ export const App: React.FC = () => {
               ))}
             </div>
 
-            {/* Message Input Form */}
             <div className="border-t border-slate-800 p-4 bg-slate-900/40">
               <form
                 onSubmit={(e) => {
