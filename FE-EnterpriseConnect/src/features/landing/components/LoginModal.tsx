@@ -40,8 +40,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-sky-950/60 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-md rounded-3xl bg-white/95 backdrop-blur-2xl border border-white p-8 shadow-2xl shadow-sky-900/40 transform transition-all">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-sky-950/60 backdrop-blur-md animate-in fade-in duration-200 cursor-default">
+      <div className="relative w-full max-w-md rounded-3xl bg-white/95 backdrop-blur-2xl border border-white p-8 shadow-2xl shadow-sky-900/40 transform transition-all cursor-auto">
         {/* Close button */}
         <button
           onClick={onClose}

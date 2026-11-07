@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
 
 export const EnterpriseCursor: React.FC = () => {
-  const [position, setPosition] = useState({ x: -100, y: -100 });
+  const [pos, setPos] = useState({ x: -100, y: -100 });
+  const [trailPos, setTrailPos] = useState({ x: -100, y: -100 });
   const [isHovered, setIsHovered] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
+    let animId: number;
+
     const onMouseMove = (e: MouseEvent) => {
-      setPosition({ x: e.clientX, y: e.clientY });
+      setPos({ x: e.clientX, y: e.clientY });
       if (!isVisible) setIsVisible(true);
 
       const target = e.target as HTMLElement | null;
@@ -29,40 +32,74 @@ export const EnterpriseCursor: React.FC = () => {
     window.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseleave', onMouseLeave);
 
+    // Spring trailing animation
+    const followCursor = () => {
+      setTrailPos((prev) => ({
+        x: prev.x + (pos.x - prev.x) * 0.25,
+        y: prev.y + (pos.y - prev.y) * 0.25,
+      }));
+      animId = requestAnimationFrame(followCursor);
+    };
+
+    animId = requestAnimationFrame(followCursor);
+
     return () => {
       window.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseleave', onMouseLeave);
+      cancelAnimationFrame(animId);
     };
-  }, [isVisible]);
+  }, [pos.x, pos.y, isVisible]);
 
   if (!isVisible) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[9999] overflow-hidden">
-      {/* Outer Spring Ring */}
+    <div className="pointer-events-none fixed inset-0 z-[9999] overflow-hidden select-none">
+      {/* 1. Trailing Ambient Soft Glow Halo */}
       <div
-        className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border transition-transform duration-150 ease-out ${
+        className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-300 ease-out ${
           isHovered
-            ? 'h-11 w-11 border-sky-300 bg-sky-400/15 shadow-[0_0_20px_rgba(56,189,248,0.5)] scale-125'
-            : 'h-8 w-8 border-white/60 bg-white/5 backdrop-blur-[1px] scale-100'
+            ? 'h-12 w-12 bg-sky-400/25 blur-md scale-125'
+            : 'h-6 w-6 bg-sky-400/15 blur-sm scale-100'
         }`}
         style={{
-          left: `${position.x}px`,
-          top: `${position.y}px`,
+          left: `${trailPos.x}px`,
+          top: `${trailPos.y}px`,
         }}
       />
-      {/* Inner Precision Orb */}
+
+      {/* 2. Sleek Minimalist Designer SVG Cursor Pointer */}
       <div
-        className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-75 ${
-          isHovered
-            ? 'h-2.5 w-2.5 bg-cyan-300 shadow-[0_0_12px_#38bdf8]'
-            : 'h-1.5 w-1.5 bg-white shadow-[0_0_8px_#ffffff]'
-        }`}
+        className="absolute transition-transform duration-75"
         style={{
-          left: `${position.x}px`,
-          top: `${position.y}px`,
+          left: `${pos.x}px`,
+          top: `${pos.y}px`,
+          transform: isHovered ? 'scale(1.15) translate(-2px, -2px)' : 'scale(1)',
         }}
-      />
+      >
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className="drop-shadow-[0_2px_8px_rgba(2,132,199,0.5)]"
+        >
+          {/* Outer Sleek Arrow */}
+          <path
+            d="M3 3L10.5 21L13.5 13.5L21 10.5L3 3Z"
+            fill="url(#cursorGradient)"
+            stroke="#ffffff"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+          />
+          <defs>
+            <linearGradient id="cursorGradient" x1="3" y1="3" x2="21" y2="21" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#0284c7" />
+              <stop offset="1" stopColor="#38bdf8" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
     </div>
   );
 };
