@@ -78,27 +78,24 @@ jobs:
       - name: Validate SSH Key Secret
         run: |
           if [ -z "$SSH_KEY_VAL" ]; then
-            echo "::error::Secret 'AWS_ENTERPRISE_CONNECTION_SECRET' is completely EMPTY or NOT FOUND in GitHub Secrets!"
+            echo "::error::Secret 'AWS_ENTERPRISE_CONNECTION_SECRET' hoặc 'EC2_SSH_KEY' chưa được cấu hình trong GitHub Secrets!"
             exit 1
           fi
-          echo "Secret is detected. Length: ${#SSH_KEY_VAL} characters."
+          echo "SSH Key secret is detected. Length: ${#SSH_KEY_VAL} characters."
           HEADER=$(echo "$SSH_KEY_VAL" | head -n 1)
-          FOOTER=$(echo "$SSH_KEY_VAL" | tail -n 1)
-          echo "Header line: ${HEADER:0:35}"
-          echo "Footer line: ${FOOTER: -35}"
           if [[ "$HEADER" != *"BEGIN"* ]]; then
-            echo "::error::Khóa SSH phải bắt đầu bằng '-----BEGIN ... PRIVATE KEY-----'. Giá trị hiện tại bắt đầu bằng: $HEADER"
+            echo "::error::Khóa SSH phải bắt đầu bằng '-----BEGIN ... PRIVATE KEY-----'. Hãy kiểm tra lại ô Secret chỉ dán duy nhất nội dung file .pem, không dán kèm tên biến!"
             exit 1
           fi
         env:
-          SSH_KEY_VAL: ${{ secrets.AWS_ENTERPRISE_CONNECTION_SECRET }}
+          SSH_KEY_VAL: ${{ secrets.AWS_ENTERPRISE_CONNECTION_SECRET || secrets.EC2_SSH_KEY }}
 
       - name: Deploy to AWS EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: 3.24.182.239
-          username: ubuntu
-          key: ${{ secrets.AWS_ENTERPRISE_CONNECTION_SECRET }}
+          host: ${{ secrets.EC2_HOST || '3.24.182.239' }}
+          username: ${{ secrets.EC2_USERNAME || 'ubuntu' }}
+          key: ${{ secrets.AWS_ENTERPRISE_CONNECTION_SECRET || secrets.EC2_SSH_KEY }}
           script_stop: true
           script: |
             echo ">>> [1/4] Pulling latest changes from repository..."
@@ -110,9 +107,9 @@ jobs:
             sudo bash -c 'cat << "ENV_EOF" > /opt/enterpriseconnect/gateway/.env
             ASPNETCORE_ENVIRONMENT=Production
             ASPNETCORE_HTTP_PORTS=8080
-            GATEWAY_SHARED_SECRET=REDACTED_GATEWAY_SECRET
-            Security__GatewaySharedSecret=REDACTED_GATEWAY_SECRET
-            JwtSettings__Secret=REDACTED_JWT_SECRET
+            GATEWAY_SHARED_SECRET=${{ secrets.GATEWAY_SHARED_SECRET || 'REDACTED_GATEWAY_SECRET' }}
+            Security__GatewaySharedSecret=${{ secrets.GATEWAY_SHARED_SECRET || 'REDACTED_GATEWAY_SECRET' }}
+            JwtSettings__Secret=${{ secrets.JWT_SECRET || 'REDACTED_JWT_SECRET' }}
             ENV_EOF'
             sudo chmod 600 /opt/enterpriseconnect/gateway/.env
 
