@@ -14,6 +14,8 @@ import {
   type UserProfile,
   type UpdateProfileRequest,
   type UploadAvatarResponse,
+  type ChangePasswordRequest,
+  type ChangePasswordResponse,
 } from '../types/auth.types';
 
 export const authApi = {
@@ -455,6 +457,48 @@ export const authApi = {
           msg = resData.title;
         } else if (resData?.message) {
           msg = resData.message;
+        }
+        throw new Error(msg);
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * Calls POST /api/Auth/change-password
+   * Request Body: { currentPassword: string, newPassword: string }
+   * Response: 200 OK { message: string }
+   */
+  changePassword: async (request: ChangePasswordRequest): Promise<ChangePasswordResponse> => {
+    try {
+      const { data } = await apiClient.post<ChangePasswordResponse>(
+        API_ENDPOINTS.AUTH.CHANGE_PASSWORD,
+        {
+          currentPassword: request.currentPassword,
+          newPassword: request.newPassword,
+        }
+      );
+      return data;
+    } catch (err: unknown) {
+      console.error('[authApi] POST /api/Auth/change-password error:', err);
+      if (axios.isAxiosError(err)) {
+        const resData = err.response?.data;
+        let msg = 'Đổi mật khẩu thất bại.';
+        if (typeof resData === 'string' && resData.trim()) {
+          msg = resData;
+        } else if (resData?.detail) {
+          msg = resData.detail;
+        } else if (resData?.message) {
+          msg = resData.message;
+        } else if (resData?.errors) {
+          if (Array.isArray(resData.errors)) {
+            msg = resData.errors.join(', ');
+          } else if (typeof resData.errors === 'object') {
+            const msgs = Object.values(resData.errors).flat();
+            if (msgs.length > 0) msg = msgs.join(', ');
+          }
+        } else if (resData?.title) {
+          msg = resData.title;
         }
         throw new Error(msg);
       }

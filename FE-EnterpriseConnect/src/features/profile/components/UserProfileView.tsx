@@ -23,6 +23,8 @@ import {
   Save,
   X,
   AlertCircle,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { authApi } from '@/features/auth/api/authApi';
 import type { UserProfile } from '@/features/auth/types/auth.types';
@@ -276,6 +278,17 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   const [prevAvatarUrl, setPrevAvatarUrl] = useState(profile?.avatarUrl);
   const [avatarError, setAvatarError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Change Password State (POST /api/Auth/change-password)
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
 
   const sessionType = tokenStorage.getSessionType();
   const timeToExpiry = tokenStorage.getTimeToExpiry();
@@ -560,6 +573,76 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  /**
+   * Handles password change:
+   * Calls POST /api/Auth/change-password with { currentPassword, newPassword }
+   * Enforces client-side validation according to enterprise security specs:
+   * - currentPassword required
+   * - newPassword required & length >= 6
+   * - newPassword != currentPassword
+   * - newPassword === confirmNewPassword
+   */
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(null);
+    setPasswordSuccess(null);
+
+    const trimmedCurrent = currentPassword.trim();
+    const trimmedNew = newPassword.trim();
+    const trimmedConfirm = confirmNewPassword.trim();
+
+    if (!trimmedCurrent) {
+      setPasswordError('Vui lòng nhập mật khẩu hiện tại.');
+      return;
+    }
+    if (!trimmedNew) {
+      setPasswordError('Vui lòng nhập mật khẩu mới.');
+      return;
+    }
+    if (trimmedNew.length < 6) {
+      setPasswordError('Mật khẩu mới phải có ít nhất 6 ký tự.');
+      return;
+    }
+    if (trimmedNew === trimmedCurrent) {
+      setPasswordError('Mật khẩu mới không được trùng với mật khẩu cũ.');
+      return;
+    }
+    if (trimmedNew !== trimmedConfirm) {
+      setPasswordError('Xác nhận mật khẩu mới không khớp.');
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const res = await authApi.changePassword({
+        currentPassword: trimmedCurrent,
+        newPassword: trimmedNew,
+      });
+      const successMsg = res.message || 'Đổi mật khẩu thành công. Toàn bộ phiên làm việc cũ đã bị thu hồi.';
+      setPasswordSuccess(successMsg);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setNotice(`✓ ${successMsg}`);
+      setTimeout(() => setNotice(null), 5000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Đổi mật khẩu thất bại. Vui lòng kiểm tra lại.';
+      setPasswordError(msg);
+      setNotice(`✕ ${msg}`);
+      setTimeout(() => setNotice(null), 5000);
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handleResetPasswordForm = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmNewPassword('');
+    setPasswordError(null);
+    setPasswordSuccess(null);
   };
 
   if (isLoading && !profile) {
@@ -889,255 +972,431 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
         </div>
 
         {/* 2. Grid Layout of Selective Enterprise Profile Fields */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Card A: Detailed Organization & Contact Data */}
-          <div className="p-6 rounded-2xl bg-[#0c2340] border border-[#1d4ed8]/30 shadow-md space-y-4 hover:border-[#38bdf8]/50 transition-all duration-200">
-            <div className="flex items-center justify-between border-b border-[#1d4ed8]/20 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#0052cc]/20 border border-[#1d4ed8]/40 flex items-center justify-center text-[#38bdf8]">
-                  <Layers className="w-4 h-4" />
-                </div>
-                <h3 className="text-base font-bold text-white">Thông Tin Định Danh & Tổ Chức</h3>
-              </div>
-              <span className="text-xs text-slate-400 font-medium">Hồ sơ xác thực</span>
-            </div>
-
-            <div className="space-y-3 text-sm">
-              {/* UUID */}
-              <div className="p-3 rounded-xl bg-[#07172b] border border-[#1d4ed8]/20 flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-xs text-slate-400">Mã định danh cá nhân (UUID)</span>
-                    <span className="text-[10px] text-slate-400 bg-[#0c2340] px-1.5 py-0.2 rounded border border-slate-700/60">
-                      Hệ thống
-                    </span>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          {/* Column 1: Organization Data, Enterprise Roles & Change Password */}
+          <div className="space-y-6 flex flex-col">
+            {/* Card A: Detailed Organization & Contact Data */}
+            <div className="p-6 rounded-2xl bg-[#0c2340] border border-[#1d4ed8]/30 shadow-md space-y-4 hover:border-[#38bdf8]/50 transition-all duration-200">
+              <div className="flex items-center justify-between border-b border-[#1d4ed8]/20 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#0052cc]/20 border border-[#1d4ed8]/40 flex items-center justify-center text-[#38bdf8]">
+                    <Layers className="w-4 h-4" />
                   </div>
-                  <span className="font-mono text-xs text-white font-medium break-all">{user.id}</span>
+                  <h3 className="text-base font-bold text-white">Thông Tin Định Danh & Tổ Chức</h3>
                 </div>
-                <button
-                  onClick={() => handleCopy(user.id, 'id')}
-                  className="p-1.5 rounded-lg bg-[#0c2340] hover:bg-[#122e54] text-slate-300 hover:text-white border border-[#1d4ed8]/30 cursor-pointer transition-colors shrink-0 ml-2"
-                  title="Sao chép UUID"
-                >
-                  {copiedField === 'id' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                </button>
+                <span className="text-xs text-slate-400 font-medium">Hồ sơ xác thực</span>
               </div>
 
-              {/* Department ID */}
-              <div className="p-3 rounded-xl bg-[#07172b] border border-[#1d4ed8]/20 flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-xs text-slate-400">Phòng ban trực thuộc</span>
-                    <span className="text-[10px] text-slate-400 bg-[#0c2340] px-1.5 py-0.2 rounded border border-slate-700/60">
-                      Phân bổ
-                    </span>
+              <div className="space-y-3 text-sm">
+                {/* UUID */}
+                <div className="p-3 rounded-xl bg-[#07172b] border border-[#1d4ed8]/20 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-xs text-slate-400">Mã định danh cá nhân (UUID)</span>
+                      <span className="text-[10px] text-slate-400 bg-[#0c2340] px-1.5 py-0.2 rounded border border-slate-700/60">
+                        Hệ thống
+                      </span>
+                    </div>
+                    <span className="font-mono text-xs text-white font-medium break-all">{user.id}</span>
                   </div>
-                  <span className="text-xs text-white font-semibold block">{user.departmentName || 'Chưa phân bổ'}</span>
-                  <span className="font-mono text-[11px] text-slate-400 block mt-0.5">{user.departmentId}</span>
-                </div>
-                <button
-                  onClick={() => handleCopy(user.departmentId || '', 'departmentId')}
-                  className="p-1.5 rounded-lg bg-[#0c2340] hover:bg-[#122e54] text-slate-300 hover:text-white border border-[#1d4ed8]/30 cursor-pointer transition-colors shrink-0 ml-2"
-                  title="Sao chép Mã phòng ban"
-                >
-                  {copiedField === 'departmentId' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                </button>
-              </div>
-
-              {/* Email & Phone Details */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="p-3 rounded-xl bg-[#07172b] border border-[#1d4ed8]/20">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-slate-400">Email công vụ</span>
-                    <span className="text-[10px] text-slate-400 bg-[#0c2340] px-1.5 py-0.2 rounded border border-slate-700/60">
-                      Cố định
-                    </span>
-                  </div>
-                  <span className="text-xs font-semibold text-white break-all flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-[#38bdf8] shrink-0" />
-                    {user.email}
-                  </span>
+                  <button
+                    onClick={() => handleCopy(user.id, 'id')}
+                    className="p-1.5 rounded-lg bg-[#0c2340] hover:bg-[#122e54] text-slate-300 hover:text-white border border-[#1d4ed8]/30 cursor-pointer transition-colors shrink-0 ml-2"
+                    title="Sao chép UUID"
+                  >
+                    {copiedField === 'id' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  </button>
                 </div>
 
-                <div className="p-3 rounded-xl bg-[#07172b] border border-[#1d4ed8]/20">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-slate-400">Số điện thoại liên lạc</span>
-                    {isEditing && (
-                      <span className="text-[10px] text-[#38bdf8] font-semibold bg-[#0c2340] px-1.5 py-0.2 rounded border border-[#38bdf8]/40">
-                        Được phép sửa
+                {/* Department ID */}
+                <div className="p-3 rounded-xl bg-[#07172b] border border-[#1d4ed8]/20 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-xs text-slate-400">Phòng ban trực thuộc</span>
+                      <span className="text-[10px] text-slate-400 bg-[#0c2340] px-1.5 py-0.2 rounded border border-slate-700/60">
+                        Phân bổ
+                      </span>
+                    </div>
+                    <span className="text-xs text-white font-semibold block">{user.departmentName || 'Chưa phân bổ'}</span>
+                    <span className="font-mono text-[11px] text-slate-400 block mt-0.5">{user.departmentId}</span>
+                  </div>
+                  <button
+                    onClick={() => handleCopy(user.departmentId || '', 'departmentId')}
+                    className="p-1.5 rounded-lg bg-[#0c2340] hover:bg-[#122e54] text-slate-300 hover:text-white border border-[#1d4ed8]/30 cursor-pointer transition-colors shrink-0 ml-2"
+                    title="Sao chép Mã phòng ban"
+                  >
+                    {copiedField === 'departmentId' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                {/* Email & Phone Details */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-[#07172b] border border-[#1d4ed8]/20">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-slate-400">Email công vụ</span>
+                      <span className="text-[10px] text-slate-400 bg-[#0c2340] px-1.5 py-0.2 rounded border border-slate-700/60">
+                        Cố định
+                      </span>
+                    </div>
+                    <span className="text-xs font-semibold text-white break-all flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-[#38bdf8] shrink-0" />
+                      {user.email}
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-[#07172b] border border-[#1d4ed8]/20">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-slate-400">Số điện thoại liên lạc</span>
+                      {isEditing && (
+                        <span className="text-[10px] text-[#38bdf8] font-semibold bg-[#0c2340] px-1.5 py-0.2 rounded border border-[#38bdf8]/40">
+                          Được phép sửa
+                        </span>
+                      )}
+                    </div>
+                    {isEditing ? (
+                      <div className="relative">
+                        <input
+                          type="tel"
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          placeholder="Nhập số điện thoại..."
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-[#0c2340] border border-[#38bdf8] text-white font-semibold text-xs focus:outline-none focus:ring-1 focus:ring-[#38bdf8] transition-all shadow-inner"
+                        />
+                      </div>
+                    ) : (
+                      <span className="text-xs font-semibold text-white flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5 text-[#38bdf8] shrink-0" />
+                        {user.phone || 'Chưa cung cấp'}
                       </span>
                     )}
                   </div>
-                  {isEditing ? (
-                    <div className="relative">
-                      <input
-                        type="tel"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        placeholder="Nhập số điện thoại..."
-                        className="w-full px-2.5 py-1.5 rounded-lg bg-[#0c2340] border border-[#38bdf8] text-white font-semibold text-xs focus:outline-none focus:ring-1 focus:ring-[#38bdf8] transition-all shadow-inner"
-                      />
-                    </div>
-                  ) : (
-                    <span className="text-xs font-semibold text-white flex items-center gap-1.5">
-                      <Phone className="w-3.5 h-3.5 text-[#38bdf8] shrink-0" />
-                      {user.phone || 'Chưa cung cấp'}
-                    </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Card C: Enterprise Roles (RBAC) */}
+            <div className="p-6 rounded-2xl bg-[#0c2340] border border-[#1d4ed8]/30 shadow-md space-y-4 hover:border-[#38bdf8]/50 transition-all duration-200">
+              <div className="flex items-center justify-between border-b border-[#1d4ed8]/20 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#0052cc]/20 border border-[#1d4ed8]/40 flex items-center justify-center text-[#38bdf8]">
+                    <ShieldAlert className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-base font-bold text-white">Vai Trò Doanh Nghiệp</h3>
+                </div>
+                <span className="text-xs text-[#38bdf8] font-semibold">{user.roles?.length || 0} vai trò</span>
+              </div>
+
+              <div className="space-y-2.5">
+                {user.roles && user.roles.length > 0 ? (
+                  user.roles.map((role, idx) => {
+                    const roleInfo = getRoleDisplay(role);
+                    return (
+                      <div
+                        key={idx}
+                        className="p-3 rounded-xl bg-[#07172b] border border-[#1d4ed8]/20 flex items-center justify-between hover:bg-[#0f2747] hover:border-[#38bdf8]/40 transition-all duration-200 group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-[#0052cc] flex items-center justify-center text-white shrink-0 group-hover:scale-105 transition-transform">
+                            <KeyRound className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="font-semibold text-sm text-white block group-hover:text-[#38bdf8] transition-colors">
+                              {roleInfo.title}
+                            </span>
+                            <span className="text-xs text-slate-400 block line-clamp-1">
+                              {roleInfo.desc}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 shrink-0 ml-2">
+                          Đang kích hoạt
+                        </span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-xs text-slate-400 p-4 text-center">Chưa có vai trò nào được gán.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Card E: Change Password (POST /api/Auth/change-password) - Bên dưới ô vai trò doanh nghiệp */}
+            <div className="p-6 rounded-2xl bg-[#0c2340] border border-[#1d4ed8]/30 shadow-md space-y-4 hover:border-[#38bdf8]/50 transition-all duration-200">
+              <div className="flex items-center justify-between border-b border-[#1d4ed8]/20 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#0052cc]/20 border border-[#1d4ed8]/40 flex items-center justify-center text-[#38bdf8]">
+                    <KeyRound className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white">Đổi Mật Khẩu</h3>
+                  </div>
+                </div>
+                <span className="text-xs text-[#38bdf8] font-semibold bg-[#07172b] px-2.5 py-1 rounded-full border border-[#1d4ed8]/30">
+                  Bảo mật tài khoản
+                </span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#07172b] border border-[#1d4ed8]/20 flex items-start gap-2.5 text-xs text-slate-300">
+                <LockIcon className="w-4 h-4 text-[#38bdf8] shrink-0 mt-0.5" />
+                <span className="leading-relaxed">
+                  Mật khẩu mới yêu cầu tối thiểu 6 ký tự. Sau khi đổi mật khẩu thành công, toàn bộ phiên làm việc cũ sẽ tự động được thu hồi để bảo đảm an toàn.
+                </span>
+              </div>
+
+              <form onSubmit={handleChangePassword} className="space-y-3.5">
+                {/* Current Password Field */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                    <span>Mật khẩu hiện tại</span>
+                    <span className="text-rose-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showCurrentPassword ? 'text' : 'password'}
+                      value={currentPassword}
+                      onChange={(e) => {
+                        setCurrentPassword(e.target.value);
+                        if (passwordError) setPasswordError(null);
+                      }}
+                      placeholder="Nhập mật khẩu đang sử dụng..."
+                      autoComplete="current-password"
+                      disabled={isChangingPassword}
+                      className="w-full bg-[#07172b] border border-[#1d4ed8]/30 rounded-xl pl-3.5 pr-10 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#38bdf8] focus:ring-1 focus:ring-[#38bdf8] transition-all disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      tabIndex={-1}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#38bdf8] transition-colors p-1"
+                      title={showCurrentPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                    >
+                      {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* New Password Field */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                      <span>Mật khẩu mới</span>
+                      <span className="text-rose-400">*</span>
+                    </label>
+                    <span className="text-[11px] text-slate-400">Tối thiểu 6 ký tự</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => {
+                        setNewPassword(e.target.value);
+                        if (passwordError) setPasswordError(null);
+                      }}
+                      placeholder="Nhập mật khẩu mới (khác mật khẩu cũ)..."
+                      autoComplete="new-password"
+                      disabled={isChangingPassword}
+                      className="w-full bg-[#07172b] border border-[#1d4ed8]/30 rounded-xl pl-3.5 pr-10 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#38bdf8] focus:ring-1 focus:ring-[#38bdf8] transition-all disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      tabIndex={-1}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#38bdf8] transition-colors p-1"
+                      title={showNewPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Confirm New Password Field */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                    <span>Xác nhận mật khẩu mới</span>
+                    <span className="text-rose-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmNewPassword}
+                      onChange={(e) => {
+                        setConfirmNewPassword(e.target.value);
+                        if (passwordError) setPasswordError(null);
+                      }}
+                      placeholder="Nhập lại mật khẩu mới..."
+                      autoComplete="new-password"
+                      disabled={isChangingPassword}
+                      className="w-full bg-[#07172b] border border-[#1d4ed8]/30 rounded-xl pl-3.5 pr-10 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#38bdf8] focus:ring-1 focus:ring-[#38bdf8] transition-all disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      tabIndex={-1}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#38bdf8] transition-colors p-1"
+                      title={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Error Banner */}
+                {passwordError && (
+                  <div className="p-3 rounded-xl bg-rose-950/70 border border-rose-500/40 flex items-start gap-2.5 text-xs text-rose-300 animate-in fade-in">
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                    <span>{passwordError}</span>
+                  </div>
+                )}
+
+                {/* Success Banner */}
+                {passwordSuccess && (
+                  <div className="p-3 rounded-xl bg-emerald-950/70 border border-emerald-500/40 flex items-start gap-2.5 text-xs text-emerald-300 animate-in fade-in">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <span>{passwordSuccess}</span>
+                  </div>
+                )}
+
+                {/* Form Action Buttons */}
+                <div className="flex items-center justify-end gap-3 pt-2 border-t border-[#1d4ed8]/20">
+                  {(currentPassword || newPassword || confirmNewPassword) && (
+                    <button
+                      type="button"
+                      onClick={handleResetPasswordForm}
+                      disabled={isChangingPassword}
+                      className="px-3.5 py-2 rounded-xl bg-[#07172b] hover:bg-[#122e54] text-slate-300 hover:text-white border border-[#1d4ed8]/30 text-xs font-semibold hover:scale-105 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      Hủy bỏ
+                    </button>
                   )}
+
+                  <button
+                    type="submit"
+                    disabled={isChangingPassword || !currentPassword || !newPassword || !confirmNewPassword}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0052cc] hover:bg-[#0065ff] text-white text-xs font-semibold hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  >
+                    {isChangingPassword ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Đang xử lý...</span>
+                      </>
+                    ) : (
+                      <>
+                        <KeyRound className="w-3.5 h-3.5" />
+                        <span>Đổi Mật Khẩu</span>
+                      </>
+                    )}
+                  </button>
                 </div>
-              </div>
+              </form>
             </div>
           </div>
 
-          {/* Card B: Security & Session Architecture */}
-          <div className="p-6 rounded-2xl bg-[#0c2340] border border-[#1d4ed8]/30 shadow-md space-y-4 hover:border-[#38bdf8]/50 transition-all duration-200">
-            <div className="flex items-center justify-between border-b border-[#1d4ed8]/20 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#0052cc]/20 border border-[#1d4ed8]/40 flex items-center justify-center text-[#38bdf8]">
-                  <ShieldCheck className="w-4 h-4" />
+          {/* Column 2: Account Security / Token Health & System Permissions */}
+          <div className="space-y-6 flex flex-col">
+            {/* Card B: Security & Session Architecture */}
+            <div className="p-6 rounded-2xl bg-[#0c2340] border border-[#1d4ed8]/30 shadow-md space-y-4 hover:border-[#38bdf8]/50 transition-all duration-200">
+              <div className="flex items-center justify-between border-b border-[#1d4ed8]/20 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#0052cc]/20 border border-[#1d4ed8]/40 flex items-center justify-center text-[#38bdf8]">
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-base font-bold text-white">Bảo Mật Tài Khoản & Phiên Làm Việc</h3>
                 </div>
-                <h3 className="text-base font-bold text-white">Bảo Mật Tài Khoản & Phiên Làm Việc</h3>
-              </div>
-              <span className="text-xs text-emerald-400 font-semibold">Bảo Vệ Đa Lớp</span>
-            </div>
-
-            <div className="space-y-3 text-sm">
-              <div className="p-3 rounded-xl bg-[#07172b] border border-[#1d4ed8]/20 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-300 font-medium flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                    Bảo vệ phiên trong bộ nhớ tạm
-                  </span>
-                  <span className="text-xs font-semibold text-emerald-400 bg-emerald-950/70 border border-emerald-500/40 px-2.5 py-0.5 rounded-full">
-                    An toàn tuyệt đối
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Khóa phiên được lưu tạm thời trong bộ nhớ máy tính và tự hủy khi hết hạn. Tuyệt đối không lưu xuống ổ đĩa, giúp loại bỏ 100% nguy cơ bị đánh cắp tài khoản từ mã độc trên web.
-                </p>
+                <span className="text-xs text-emerald-400 font-semibold">Bảo Vệ Đa Lớp</span>
               </div>
 
-              <div className="p-3 rounded-xl bg-[#07172b] border border-[#1d4ed8]/20 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-300 font-medium flex items-center gap-1.5">
-                    <LockIcon className="w-4 h-4 text-[#38bdf8] shrink-0" />
-                    Cơ chế tự động duy trì đăng nhập
-                  </span>
-                  <span className="text-xs font-semibold text-[#38bdf8] bg-[#0c2340] border border-[#1d4ed8]/40 px-2.5 py-0.5 rounded-full">
-                    Bảo vệ trình duyệt
-                  </span>
+              <div className="space-y-3 text-sm">
+                <div className="p-3 rounded-xl bg-[#07172b] border border-[#1d4ed8]/20 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-300 font-medium flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                      Bảo vệ phiên trong bộ nhớ tạm
+                    </span>
+                    <span className="text-xs font-semibold text-emerald-400 bg-emerald-950/70 border border-emerald-500/40 px-2.5 py-0.5 rounded-full">
+                      An toàn tuyệt đối
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Khóa phiên được lưu tạm thời trong bộ nhớ máy tính và tự hủy khi hết hạn. Tuyệt đối không lưu xuống ổ đĩa, giúp loại bỏ 100% nguy cơ bị đánh cắp tài khoản từ mã độc trên web.
+                  </p>
                 </div>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  {sessionType === 'persistent'
-                    ? 'Chế độ ghi nhớ (30 ngày): Bạn có thể đóng trình duyệt và quay lại làm việc bình thường mà không cần đăng nhập lại. Dữ liệu phiên được trình duyệt khóa bảo mật độc lập theo tiêu chuẩn ngân hàng.'
-                    : 'Chế độ phiên tạm thời: Trình duyệt sẽ tự động xóa sạch dữ liệu phiên và đăng xuất an toàn ngay khi bạn đóng cửa sổ làm việc.'}
-                </p>
-              </div>
 
-              <div className="p-3 rounded-xl bg-[#07172b] border border-[#1d4ed8]/20 flex items-center justify-between">
-                <div>
-                  <span className="text-xs text-slate-400 block mb-0.5">Trạng thái phiên làm việc</span>
-                  <span className="text-xs font-bold text-white">
+                <div className="p-3 rounded-xl bg-[#07172b] border border-[#1d4ed8]/20 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-300 font-medium flex items-center gap-1.5">
+                      <LockIcon className="w-4 h-4 text-[#38bdf8] shrink-0" />
+                      Cơ chế tự động duy trì đăng nhập
+                    </span>
+                    <span className="text-xs font-semibold text-[#38bdf8] bg-[#0c2340] border border-[#1d4ed8]/40 px-2.5 py-0.5 rounded-full">
+                      Bảo vệ trình duyệt
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
                     {sessionType === 'persistent'
-                      ? 'Đang duy trì đăng nhập (30 ngày trên thiết bị này)'
-                      : 'Phiên làm việc tạm thời (Tự thoát khi đóng trình duyệt)'}
-                  </span>
+                      ? 'Chế độ ghi nhớ (30 ngày): Bạn có thể đóng trình duyệt và quay lại làm việc bình thường mà không cần đăng nhập lại. Dữ liệu phiên được trình duyệt khóa bảo mật độc lập theo tiêu chuẩn ngân hàng.'
+                      : 'Chế độ phiên tạm thời: Trình duyệt sẽ tự động xóa sạch dữ liệu phiên và đăng xuất an toàn ngay khi bạn đóng cửa sổ làm việc.'}
+                  </p>
                 </div>
-                <button
-                  onClick={() => authApi.refreshToken()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0052cc] hover:bg-[#0065ff] text-white text-xs font-semibold hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer shadow-sm"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Làm mới phiên</span>
-                </button>
+
+                <div className="p-3 rounded-xl bg-[#07172b] border border-[#1d4ed8]/20 flex items-center justify-between">
+                  <div>
+                    <span className="text-xs text-slate-400 block mb-0.5">Trạng thái phiên làm việc</span>
+                    <span className="text-xs font-bold text-white">
+                      {sessionType === 'persistent'
+                        ? 'Đang duy trì đăng nhập (30 ngày trên thiết bị này)'
+                        : 'Phiên làm việc tạm thời (Tự thoát khi đóng trình duyệt)'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => authApi.refreshToken()}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0052cc] hover:bg-[#0065ff] text-white text-xs font-semibold hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer shadow-sm"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Làm mới phiên</span>
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Card C: Enterprise Roles (RBAC) */}
-          <div className="p-6 rounded-2xl bg-[#0c2340] border border-[#1d4ed8]/30 shadow-md space-y-4 hover:border-[#38bdf8]/50 transition-all duration-200">
-            <div className="flex items-center justify-between border-b border-[#1d4ed8]/20 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#0052cc]/20 border border-[#1d4ed8]/40 flex items-center justify-center text-[#38bdf8]">
-                  <ShieldAlert className="w-4 h-4" />
+            {/* Card D: Permissions Matrix */}
+            <div className="p-6 rounded-2xl bg-[#0c2340] border border-[#1d4ed8]/30 shadow-md space-y-4 hover:border-[#38bdf8]/50 transition-all duration-200">
+              <div className="flex items-center justify-between border-b border-[#1d4ed8]/20 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#0052cc]/20 border border-[#1d4ed8]/40 flex items-center justify-center text-[#38bdf8]">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-base font-bold text-white">Đặc Quyền Hệ Thống</h3>
                 </div>
-                <h3 className="text-base font-bold text-white">Vai Trò Doanh Nghiệp</h3>
+                <span className="text-xs text-[#38bdf8] font-semibold">{user.permissions?.length || 0} đặc quyền đã cấp</span>
               </div>
-              <span className="text-xs text-[#38bdf8] font-semibold">{user.roles?.length || 0} vai trò</span>
-            </div>
 
-            <div className="space-y-2.5">
-              {user.roles && user.roles.length > 0 ? (
-                user.roles.map((role, idx) => {
-                  const roleInfo = getRoleDisplay(role);
-                  return (
-                    <div
-                      key={idx}
-                      className="p-3 rounded-xl bg-[#07172b] border border-[#1d4ed8]/20 flex items-center justify-between hover:bg-[#0f2747] hover:border-[#38bdf8]/40 transition-all duration-200 group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-[#0052cc] flex items-center justify-center text-white shrink-0 group-hover:scale-105 transition-transform">
-                          <KeyRound className="w-4 h-4" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-72 overflow-y-auto pr-1">
+                {user.permissions && user.permissions.length > 0 ? (
+                  user.permissions.map((perm, idx) => {
+                    const permInfo = getPermissionDisplay(perm);
+                    return (
+                      <div
+                        key={idx}
+                        className="p-3 rounded-xl bg-[#07172b] border border-[#1d4ed8]/20 flex items-start gap-3 hover:bg-[#0f2747] hover:border-[#38bdf8]/40 transition-all duration-200 group"
+                      >
+                        <div className="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0 mt-0.5 text-emerald-400 group-hover:scale-110 transition-transform">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
                         </div>
-                        <div>
-                          <span className="font-semibold text-sm text-white block group-hover:text-[#38bdf8] transition-colors">
-                            {roleInfo.title}
+                        <div className="overflow-hidden space-y-0.5">
+                          <span className="text-xs font-semibold text-white block truncate group-hover:text-[#38bdf8] transition-colors leading-tight">
+                            {permInfo.title}
                           </span>
-                          <span className="text-xs text-slate-400 block line-clamp-1">
-                            {roleInfo.desc}
+                          <span className="text-[11px] text-slate-400 block line-clamp-1 leading-relaxed">
+                            {permInfo.desc}
                           </span>
                         </div>
                       </div>
-                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 shrink-0 ml-2">
-                        Đang kích hoạt
-                      </span>
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="text-xs text-slate-400 p-4 text-center">Chưa có vai trò nào được gán.</p>
-              )}
-            </div>
-          </div>
-
-          {/* Card D: Permissions Matrix */}
-          <div className="p-6 rounded-2xl bg-[#0c2340] border border-[#1d4ed8]/30 shadow-md space-y-4 hover:border-[#38bdf8]/50 transition-all duration-200">
-            <div className="flex items-center justify-between border-b border-[#1d4ed8]/20 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#0052cc]/20 border border-[#1d4ed8]/40 flex items-center justify-center text-[#38bdf8]">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <h3 className="text-base font-bold text-white">Đặc Quyền Hệ Thống</h3>
+                    );
+                  })
+                ) : (
+                  <p className="text-xs text-slate-400 p-4 col-span-2 text-center">Chưa có đặc quyền nào.</p>
+                )}
               </div>
-              <span className="text-xs text-[#38bdf8] font-semibold">{user.permissions?.length || 0} đặc quyền đã cấp</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-72 overflow-y-auto pr-1">
-              {user.permissions && user.permissions.length > 0 ? (
-                user.permissions.map((perm, idx) => {
-                  const permInfo = getPermissionDisplay(perm);
-                  return (
-                    <div
-                      key={idx}
-                      className="p-3 rounded-xl bg-[#07172b] border border-[#1d4ed8]/20 flex items-start gap-3 hover:bg-[#0f2747] hover:border-[#38bdf8]/40 transition-all duration-200 group"
-                    >
-                      <div className="w-6 h-6 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0 mt-0.5 text-emerald-400 group-hover:scale-110 transition-transform">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                      </div>
-                      <div className="overflow-hidden space-y-0.5">
-                        <span className="text-xs font-semibold text-white block truncate group-hover:text-[#38bdf8] transition-colors leading-tight">
-                          {permInfo.title}
-                        </span>
-                        <span className="text-[11px] text-slate-400 block line-clamp-1 leading-relaxed">
-                          {permInfo.desc}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="text-xs text-slate-400 p-4 col-span-2 text-center">Chưa có đặc quyền nào.</p>
-              )}
             </div>
           </div>
         </div>
