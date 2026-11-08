@@ -20,12 +20,15 @@ public class SmtpEmailSender : IEmailSender
 
     public async Task SendEmailAsync(string toEmail, string subject, string bodyHtml, CancellationToken cancellationToken = default)
     {
-        var smtpHost = _configuration["SmtpSettings:Host"] ?? "localhost";
-        var smtpPort = int.TryParse(_configuration["SmtpSettings:Port"], out var port) ? port : 587;
-        var smtpUser = _configuration["SmtpSettings:Username"];
-        var smtpPass = _configuration["SmtpSettings:Password"];
-        var senderEmail = _configuration["SmtpSettings:SenderEmail"] ?? "no-reply@enterpriseconnect.com";
-        var senderName = _configuration["SmtpSettings:SenderName"] ?? "Enterprise Connect";
+        var smtpHost = (_configuration["SmtpSettings:Host"] ?? "localhost").Trim('"', '\'', ' ');
+        var rawPort = _configuration["SmtpSettings:Port"]?.Trim('"', '\'', ' ');
+        var smtpPort = int.TryParse(rawPort, out var port) ? port : 587;
+        var smtpUser = _configuration["SmtpSettings:Username"]?.Trim('"', '\'', ' ');
+        var rawPass = _configuration["SmtpSettings:Password"]?.Trim('"', '\'', ' ');
+        // Mật khẩu ứng dụng Google (App Password) có thể chứa khoảng trắng dạng 4 cụm, tự động chuẩn hóa
+        var smtpPass = rawPass?.Replace(" ", "");
+        var senderEmail = (_configuration["SmtpSettings:SenderEmail"] ?? "no-reply@enterpriseconnect.com").Trim('"', '\'', ' ');
+        var senderName = (_configuration["SmtpSettings:SenderName"] ?? "Enterprise Connect").Trim('"', '\'', ' ');
 
         try
         {
@@ -51,7 +54,11 @@ public class SmtpEmailSender : IEmailSender
                 return;
             }
 
-            await client.ConnectAsync(smtpHost, smtpPort, SecureSocketOptions.StartTlsWhenAvailable, cancellationToken);
+            var secureOption = smtpPort == 465 
+                ? SecureSocketOptions.SslOnConnect 
+                : SecureSocketOptions.StartTlsWhenAvailable;
+
+            await client.ConnectAsync(smtpHost, smtpPort, secureOption, cancellationToken);
             if (!string.IsNullOrEmpty(smtpUser))
             {
                 await client.AuthenticateAsync(smtpUser, smtpPass, cancellationToken);
@@ -59,6 +66,7 @@ public class SmtpEmailSender : IEmailSender
 
             await client.SendAsync(message, cancellationToken);
             await client.DisconnectAsync(true, cancellationToken);
+            _logger.LogInformation("✓ Đã gửi email OTP thành công qua SMTP Google tới {ToEmail}", toEmail);
         }
         catch (Exception ex)
         {
