@@ -101,51 +101,56 @@ jobs:
           GATEWAY_SECRET: ${{ secrets.GATEWAY_SHARED_SECRET || 'REDACTED_GATEWAY_SECRET' }}
           JWT_SECRET: ${{ secrets.JWT_SECRET || 'REDACTED_JWT_SECRET' }}
         run: |
+          set -euo pipefail
+          SSH_OPTS="-i $HOME/.ssh/deploy_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 -o ServerAliveInterval=15"
+          trap 'rm -f "$HOME/.ssh/deploy_key" /tmp/gateway.env /tmp/gateway.tar.gz' EXIT
+
           echo ">>> [1/5] Setting up secure SSH key..."
           mkdir -p ~/.ssh
-          echo "$SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -T 15 -H "$EC2_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-          echo ">>> [2/5] Packaging API Gateway source code (Zero-Git on EC2)..."
-          tar --exclude='.git' --exclude='bin' --exclude='obj' --exclude='node_modules' -czf /tmp/gateway.tar.gz \
-            EnterpriseConnect.ApiGateway \
-            BuildingBlocks 2>/dev/null || tar --exclude='.git' -czf /tmp/gateway.tar.gz EnterpriseConnect.ApiGateway
+          echo ">>> [2/5] Packaging API Gateway source (Dockerfile only needs this folder)..."
+          tar --exclude='bin' --exclude='obj' -czf /tmp/gateway.tar.gz EnterpriseConnect.ApiGateway
+          ls -lh /tmp/gateway.tar.gz
 
-          echo ">>> [3/5] Generating protected .env configuration..."
-          cat << 'ENV_EOF' > /tmp/gateway.env
-ASPNETCORE_ENVIRONMENT=Production
-ASPNETCORE_HTTP_PORTS=8080
-GATEWAY_SHARED_SECRET=${{ secrets.GATEWAY_SHARED_SECRET || 'REDACTED_GATEWAY_SECRET' }}
-Security__GatewaySharedSecret=${{ secrets.GATEWAY_SHARED_SECRET || 'REDACTED_GATEWAY_SECRET' }}
-JwtSettings__Secret=${{ secrets.JWT_SECRET || 'REDACTED_JWT_SECRET' }}
-ENV_EOF
+          echo ">>> [3/5] Generating .env from step env vars (no secrets inlined in script)..."
+          umask 077
+          {
+            printf '%s\n' "ASPNETCORE_ENVIRONMENT=Production"
+            printf '%s\n' "ASPNETCORE_HTTP_PORTS=8080"
+            printf '%s\n' "GATEWAY_SHARED_SECRET=${GATEWAY_SECRET}"
+            printf '%s\n' "Security__GatewaySharedSecret=${GATEWAY_SECRET}"
+            printf '%s\n' "JwtSettings__Secret=${JWT_SECRET}"
+          } > /tmp/gateway.env
 
-          echo ">>> [4/5] Transferring files directly to EC2 via SCP..."
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key /tmp/gateway.tar.gz ${EC2_USER}@${EC2_HOST}:/tmp/gateway.tar.gz
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key /tmp/gateway.env ${EC2_USER}@${EC2_HOST}:/tmp/gateway.env
+          echo ">>> [4/5] Transferring package to EC2 via SCP..."
+          scp $SSH_OPTS /tmp/gateway.tar.gz /tmp/gateway.env "${EC2_USER}@${EC2_HOST}:/tmp/"
 
-          echo ">>> [5/5] Executing deployment and smoke test on EC2..."
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ${EC2_USER}@${EC2_HOST} bash -s << 'REMOTE_EOF'
+          echo ">>> [5/5] Building & restarting Gateway on EC2..."
+          ssh $SSH_OPTS "${EC2_USER}@${EC2_HOST}" 'bash -s' << 'REMOTE_EOF'
             set -euo pipefail
+            RELEASE_DIR=/opt/enterpriseconnect/release-gateway
 
-            echo ">>> Extracting source files into /opt/enterpriseconnect..."
-            sudo mkdir -p /opt/enterpriseconnect
-            sudo tar -xzf /tmp/gateway.tar.gz -C /opt/enterpriseconnect
+            echo ">>> Extracting into clean release dir (no stale files)..."
+            sudo rm -rf "$RELEASE_DIR"
+            sudo mkdir -p "$RELEASE_DIR"
+            sudo tar -xzf /tmp/gateway.tar.gz -C "$RELEASE_DIR"
             rm -f /tmp/gateway.tar.gz
 
-            echo ">>> Deploying protected .env file..."
+            echo ">>> Installing protected .env file..."
             sudo mkdir -p /opt/enterpriseconnect/gateway
             sudo mv /tmp/gateway.env /opt/enterpriseconnect/gateway/.env
+            sudo chown root:root /opt/enterpriseconnect/gateway/.env
             sudo chmod 600 /opt/enterpriseconnect/gateway/.env
 
-            echo ">>> Building API Gateway Docker image..."
-            cd /opt/enterpriseconnect
+            echo ">>> Building Docker image..."
+            cd "$RELEASE_DIR"
             sudo docker build -f EnterpriseConnect.ApiGateway/Dockerfile -t enterpriseconnect-gateway:latest .
 
-            echo ">>> Restarting container (bound to 127.0.0.1:8080 behind Nginx)..."
-            sudo docker stop enterpriseconnect-api-gateway 2>/dev/null || true
-            sudo docker rm enterpriseconnect-api-gateway 2>/dev/null || true
+            echo ">>> Restarting container (127.0.0.1:8080 behind Nginx)..."
+            sudo docker rm -f enterpriseconnect-api-gateway 2>/dev/null || true
             sudo docker run -d \
               --name enterpriseconnect-api-gateway \
               --restart unless-stopped \
@@ -153,14 +158,26 @@ ENV_EOF
               --env-file /opt/enterpriseconnect/gateway/.env \
               enterpriseconnect-gateway:latest
 
-            sleep 5
-            echo ">>> Running Smoke Test verification on Gateway..."
-            curl -f -s http://127.0.0.1:8080/health/live || exit 1
-            echo ">>> Verifying Downstream Reverse Proxy Routing to 5 Microservices..."
-            echo "1. Identity Service: $(curl -s http://127.0.0.1:8080/identity/health/live | cut -c 1-60)..."
-            echo "2. Messaging Service: $(curl -s http://127.0.0.1:8080/messaging/health/live | cut -c 1-60)..."
-            echo "3. Media Service: $(curl -s http://127.0.0.1:8080/media/health/live | cut -c 1-60)..."
-            echo "4. Remote Service: $(curl -s http://127.0.0.1:8080/remote/health/live | cut -c 1-60)..."
-            echo "5. Admin Service: $(curl -s http://127.0.0.1:8080/admin/health/live | cut -c 1-60)..."
-            echo "Deployment to AWS EC2 and End-to-End Routing completed successfully!"
+            echo ">>> Smoke test (retry up to 60s)..."
+            for i in $(seq 1 30); do
+              if curl -fsS http://127.0.0.1:8080/health/live > /dev/null; then
+                echo "Gateway healthy after ${i} attempt(s)."
+                break
+              fi
+              if [ "$i" -eq 30 ]; then
+                echo "::error::Gateway did not become healthy. Container logs:"
+                sudo docker logs --tail 80 enterpriseconnect-api-gateway || true
+                exit 1
+              fi
+              sleep 2
+            done
+
+            echo ">>> Downstream routing check (informational)..."
+            for svc in identity messaging media remote admin; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "http://127.0.0.1:8080/${svc}/health/live" || echo "000")
+              echo "  - ${svc}: HTTP ${code}"
+            done
+
+            sudo docker image prune -f > /dev/null 2>&1 || true
+            echo "Deployment to AWS EC2 completed successfully!"
           REMOTE_EOF
