@@ -59,6 +59,8 @@ public class UsersController : ControllerBase
     [Authorize]
     [HttpPost("profile/avatar")]
     [Consumes("multipart/form-data")]
+    [RequestSizeLimit(25 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 25 * 1024 * 1024)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> UploadAvatar(IFormFile file, CancellationToken cancellationToken)

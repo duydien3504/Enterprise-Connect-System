@@ -91,10 +91,23 @@ public static class DependencyInjection
             {
                 OnMessageReceived = context =>
                 {
-                    var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
-                    if (!string.IsNullOrEmpty(authHeader) && !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                    var accessToken = context.Request.Query["access_token"];
+                    var path = context.HttpContext.Request.Path;
+                    if (!string.IsNullOrEmpty(accessToken) && (path.StartsWithSegments("/hubs") || path.StartsWithSegments("/identity/hubs")))
                     {
-                        context.Token = authHeader.Trim();
+                        context.Token = accessToken;
+                        return Task.CompletedTask;
+                    }
+
+                    var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+                    if (!string.IsNullOrEmpty(authHeader))
+                    {
+                        var raw = authHeader.Trim();
+                        while (raw.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                        {
+                            raw = raw.Substring(7).Trim();
+                        }
+                        context.Token = raw;
                     }
                     return Task.CompletedTask;
                 }

@@ -11,6 +11,7 @@ export const API_ENDPOINTS = {
   USERS: {
     PROFILE: '/api/Users/profile',
     UPDATE: '/api/Users/profile',
+    AVATAR: '/api/Users/profile/avatar',
   },
   CONTACTS: {
     BASE: '/api/Contacts',

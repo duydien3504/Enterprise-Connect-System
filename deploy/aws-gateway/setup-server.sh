@@ -63,6 +63,15 @@ fi
 sudo systemctl enable --now docker
 echo "✓ Docker Engine đã sẵn sàng!"
 
+# 3.1 Cấu hình Nginx Upload Limits (Chống 413 Request Entity Too Large khi upload avatar / media)
+if command -v nginx &> /dev/null; then
+  echo ">>> [3.1] Cấu hình Nginx client_max_body_size 25M..."
+  sudo sed -i '/client_max_body_size/d' /etc/nginx/nginx.conf
+  sudo sed -i '/http {/a \    client_max_body_size 25M;' /etc/nginx/nginx.conf
+  sudo nginx -t && sudo systemctl reload nginx 2>/dev/null || true
+  echo "✓ Đã tối ưu hóa Nginx tiếp nhận tải tệp lên tới 25MB!"
+fi
+
 # 4. Triển khai API Gateway Container
 echo ">>> [4/5] Cấu hình và khởi chạy EnterpriseConnect API Gateway..."
 sudo mkdir -p /opt/enterpriseconnect/gateway

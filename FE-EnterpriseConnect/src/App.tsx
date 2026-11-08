@@ -5,71 +5,155 @@ import {
   PhoneCall,
   Monitor,
   ShieldAlert,
-  Server,
-  ExternalLink,
   CheckCircle2,
-  XCircle,
   Radio,
-  Send,
   LogOut,
-  Sparkles,
+  RefreshCw,
+  Clock,
+  ShieldCheck,
 } from 'lucide-react';
-import { ENV } from '@/core/config/env';
 import { signalRManager, type ConnectionState } from '@/core/signalr/signalRManager';
 import { tokenStorage } from '@/core/storage/tokenStorage';
-import { Button } from '@/shared/components/Button';
-import { Input } from '@/shared/components/Input';
+import { authApi } from '@/features/auth/api/authApi';
+import { onSessionExpired } from '@/core/api/apiClient';
 import { Avatar } from '@/shared/components/Avatar';
-import { Badge } from '@/shared/components/Badge';
 import { LandingHero3D } from '@/features/landing/components/LandingHero3D';
 import { LoginModal } from '@/features/landing/components/LoginModal';
+import { EnterpriseChatModule } from '@/features/chat/components/EnterpriseChatModule';
+import { UserProfileView } from '@/features/profile/components/UserProfileView';
+import type { SessionType, UserProfile } from '@/features/auth/types/auth.types';
 
 export const App: React.FC = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // Synchronously restore session from client cookie storage on F5 page reload
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => tokenStorage.hasActiveSession());
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chat' | 'contacts' | 'calls' | 'remote' | 'admin'>('chat');
+  const [sessionType, setSessionType] = useState<SessionType>(() => tokenStorage.getSessionType());
+  const [timeToExpiry, setTimeToExpiry] = useState<number>(() => tokenStorage.getTimeToExpiry());
+  const [isRefreshingToken, setIsRefreshingToken] = useState(false);
+  const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => tokenStorage.getUser());
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<'chat' | 'contacts' | 'calls' | 'remote' | 'admin' | 'profile'>('chat');
   const [signalRState, setSignalRState] = useState<ConnectionState>('Disconnected');
-  const [gatewayStatus, setGatewayStatus] = useState<'checking' | 'healthy' | 'error'>('checking');
-  const [messages, setMessages] = useState<Array<{ id: string; sender: string; text: string; time: string }>>([
-    { id: '1', sender: 'System Gateway', text: 'Chào mừng bạn đến với EnterpriseConnect! API Gateway https://api.hugonef.id.vn đã sẵn sàng.', time: '10:00' },
-  ]);
-  const [inputMsg, setInputMsg] = useState('');
 
-  // Check Gateway Health & Token on mount
+  // Check Token & Silent Refresh on mount (Preserving Session across F5 reloads via Hybrid Coordinated Vault)
   useEffect(() => {
-    fetch(`${ENV.API_BASE_URL}/health/live`)
-      .then((res) => (res.ok ? setGatewayStatus('healthy') : setGatewayStatus('error')))
-      .catch(() => setGatewayStatus('error'));
+    const unsubscribeSignalR = signalRManager.subscribeState(setSignalRState);
 
-    const unsubscribe = signalRManager.subscribeState(setSignalRState);
-    if (tokenStorage.getAccessToken()) {
-      setIsLoggedIn(true);
+    // Initial silent refresh: Check for active session in Vault (Option A: 30 days vs Option B: session-only)
+    if (tokenStorage.hasActiveSession()) {
       signalRManager.connectChat().catch(() => {});
+
+      authApi.silentRefresh().then((authenticated) => {
+        if (authenticated) {
+          setTimeToExpiry(tokenStorage.getTimeToExpiry());
+          setCurrentUser(tokenStorage.getUser());
+          authApi.getProfile().then(setCurrentUser).catch(() => {});
+        } else {
+          // Only log out if silentRefresh explicitly confirmed session revocation from server
+          setIsLoggedIn(false);
+          signalRManager.disconnectChat();
+          setCurrentUser(null);
+        }
+      });
     }
-    return () => unsubscribe();
+
+    const unsubscribeExpired = onSessionExpired(() => {
+      setIsLoggedIn(false);
+      signalRManager.disconnectChat();
+      setCurrentUser(null);
+    });
+
+    // Multi-tab Session Synchronization
+    const unsubscribeBroadcast = tokenStorage.onAuthBroadcast((event) => {
+      if (event.type === 'LOGOUT') {
+        setIsLoggedIn(false);
+        signalRManager.disconnectChat();
+        setCurrentUser(null);
+      } else if (event.type === 'LOGIN' || event.type === 'REFRESH') {
+        setIsLoggedIn(true);
+        setCurrentUser(tokenStorage.getUser());
+        setTimeToExpiry(tokenStorage.getTimeToExpiry());
+        signalRManager.connectChat().catch(() => {});
+      }
+    });
+
+    return () => {
+      unsubscribeSignalR();
+      unsubscribeExpired();
+      unsubscribeBroadcast();
+    };
   }, []);
+
+  // Live countdown ticker for the in-memory RAM Access Token
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    const interval = setInterval(() => {
+      const remaining = tokenStorage.getTimeToExpiry();
+      setTimeToExpiry(remaining);
+
+      if (remaining === 0 && tokenStorage.isTokenExpired()) {
+        authApi.refreshToken().catch(() => {
+          if (!tokenStorage.hasActiveSession()) {
+            setIsLoggedIn(false);
+            setCurrentUser(null);
+          }
+        });
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isLoggedIn]);
 
   const handleLoginSuccess = () => {
     setIsLoggedIn(true);
+    setSessionType(tokenStorage.getSessionType());
+    setTimeToExpiry(tokenStorage.getTimeToExpiry());
+    setCurrentUser(tokenStorage.getUser());
     signalRManager.connectChat().catch(() => {});
+    authApi.getProfile().then(setCurrentUser).catch(() => {});
   };
 
-  const handleLogout = () => {
-    tokenStorage.clear();
-    setIsLoggedIn(false);
-    signalRManager.disconnectChat();
+  /**
+   * Calls POST /api/Auth/logout with { refreshToken: "..." }
+   * Wipes RAM token, stops scheduler, revokes session cookie
+   */
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await authApi.logout();
+    } catch (err) {
+      console.warn('[App] Logout execution finished:', err);
+    } finally {
+      setIsLoggedIn(false);
+      signalRManager.disconnectChat();
+      setCurrentUser(null);
+      setIsLoggingOut(false);
+      setActiveTab('chat');
+    }
   };
 
-  const handleSendMessage = () => {
-    if (!inputMsg.trim()) return;
-    const newMsg = {
-      id: Date.now().toString(),
-      sender: 'Tôi',
-      text: inputMsg,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-    setMessages((prev) => [...prev, newMsg]);
-    setInputMsg('');
+  const handleManualRefresh = async () => {
+    setIsRefreshingToken(true);
+    setRefreshNotice(null);
+    try {
+      await authApi.refreshToken();
+      setTimeToExpiry(tokenStorage.getTimeToExpiry());
+      setRefreshNotice('Đã làm mới RAM Token!');
+      setTimeout(() => setRefreshNotice(null), 3000);
+    } catch {
+      setRefreshNotice('Làm mới thất bại.');
+    } finally {
+      setIsRefreshingToken(false);
+    }
+  };
+
+  const formatCountdown = (totalSeconds: number) => {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
   // If NOT logged in, show the full 3D Landing Page
@@ -89,208 +173,201 @@ export const App: React.FC = () => {
   // If logged in, show the Enterprise Workspace Portal
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-950 text-slate-100">
-      {/* 1. App Left Sidebar */}
-      <aside className="w-18 flex flex-col items-center justify-between border-r border-slate-800 bg-slate-900/80 py-4 backdrop-blur-md">
+      {/* 1. App Left Rail Sidebar - Ergonomic & Softened Micro-interactions */}
+      <aside className="w-18 shrink-0 flex flex-col items-center justify-between border-r border-[#1d4ed8]/20 bg-[#0c2340] py-4 select-none z-20">
         <div className="flex flex-col items-center gap-6">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 shadow-lg shadow-indigo-500/20">
-            <Radio className="h-6 w-6 text-white" />
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0052cc] text-white shadow-lg shadow-[#0052cc]/30 hover:scale-105 transition-transform duration-200">
+            <Radio className="h-5 w-5 text-white" />
           </div>
 
-          <nav className="flex flex-col gap-2">
+          <nav className="flex flex-col gap-3">
             {[
-              { id: 'chat', icon: MessageSquare, label: 'Chat' },
-              { id: 'contacts', icon: Users, label: 'Danh bạ' },
-              { id: 'calls', icon: PhoneCall, label: 'Gọi thoại' },
-              { id: 'remote', icon: Monitor, label: 'Remote' },
-              { id: 'admin', icon: ShieldAlert, label: 'Admin' },
+              { id: 'chat', icon: MessageSquare, label: 'Nhắn tin & AI Copilot' },
+              { id: 'contacts', icon: Users, label: 'Danh bạ doanh nghiệp' },
+              { id: 'calls', icon: PhoneCall, label: 'Cuộc gọi WebRTC' },
+              { id: 'remote', icon: Monitor, label: 'Hỗ trợ từ xa Remote' },
+              { id: 'admin', icon: ShieldAlert, label: 'Quản trị & Giám sát' },
             ].map(({ id, icon: Icon, label }) => (
               <button
                 key={id}
                 onClick={() => setActiveTab(id as typeof activeTab)}
                 title={label}
-                className={`flex h-11 w-11 items-center justify-center rounded-xl transition-all cursor-pointer ${
+                className={`relative group flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-200 ease-out cursor-pointer ${
                   activeTab === id
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                    ? 'bg-[#0052cc] text-white shadow-md shadow-[#0052cc]/40 scale-105'
+                    : 'text-slate-400 hover:bg-[#122e54] hover:text-white hover:scale-105 active:scale-95'
                 }`}
               >
-                <Icon className="h-5 w-5" />
+                <Icon className="h-5 w-5 transition-transform duration-200 group-hover:scale-110" />
+                {activeTab === id && (
+                  <span className="absolute left-0 w-1 h-5 rounded-r bg-[#38bdf8]" />
+                )}
               </button>
             ))}
           </nav>
         </div>
 
         <div className="flex flex-col items-center gap-3">
-          <Avatar name="Enterprise User" size="md" status="online" />
+          <div
+            onClick={() => setActiveTab('profile')}
+            title="Hồ sơ cá nhân & Đặc quyền (GET /api/Users/profile)"
+            className={`relative p-0.5 rounded-full transition-all duration-200 cursor-pointer ${
+              activeTab === 'profile'
+                ? 'ring-2 ring-[#38bdf8] scale-105 shadow-md shadow-[#0052cc]/50'
+                : 'hover:scale-110 active:scale-95'
+            }`}
+          >
+            <Avatar name={currentUser?.fullName || "Enterprise User"} src={currentUser?.avatarUrl} size="md" status="online" />
+            {activeTab === 'profile' && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[#38bdf8] border-2 border-[#0c2340]" />
+            )}
+          </div>
         </div>
       </aside>
 
       {/* 2. Main Workspace Layout */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Header Bar */}
-        <header className="flex h-16 items-center justify-between border-b border-slate-800 bg-slate-900/50 px-6 backdrop-blur-sm">
+        {/* Header Bar - Harmonized & Clean */}
+        <header className="h-16 px-6 bg-[#07172b] border-b border-slate-800 flex items-center justify-between shrink-0 z-10 select-none">
+          {/* Left Title */}
           <div className="flex items-center gap-3">
-            <h1 className="text-lg font-bold tracking-tight text-white">EnterpriseConnect Workspace</h1>
-            <Badge variant="primary" className="font-mono text-[11px]">
-              Active Session
-            </Badge>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-[#0052cc] flex items-center justify-center text-white font-bold text-xs shadow-md">
+                EC
+              </div>
+              <div className="flex flex-col">
+                <h1 className="text-sm font-bold tracking-tight text-white leading-tight">
+                  Enterprise Connection
+                </h1>
+                <span className="text-xs text-[#38bdf8] font-medium leading-tight">
+                  {activeTab === 'chat' && 'Nhắn Tin Doanh Nghiệp Thời Gian Thực & AI Copilot'}
+                  {activeTab === 'contacts' && 'Danh Bạ Doanh Nghiệp'}
+                  {activeTab === 'calls' && 'Cuộc Gọi WebRTC E2E'}
+                  {activeTab === 'remote' && 'Hỗ Trợ Từ Xa'}
+                  {activeTab === 'admin' && 'Trung Tâm Giám Sát An Ninh'}
+                  {activeTab === 'profile' && 'Hồ Sơ Cá Nhân & Quản Trị Đặc Quyền'}
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/90 px-3 py-1.5 text-xs">
-              <Server className="h-3.5 w-3.5 text-indigo-400" />
-              <span className="font-mono text-slate-400">Gateway:</span>
-              <span className="font-mono font-medium text-slate-200">api.hugonef.id.vn</span>
-              {gatewayStatus === 'healthy' ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-              ) : gatewayStatus === 'error' ? (
-                <XCircle className="h-4 w-4 text-rose-400" />
-              ) : (
-                <span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" />
-              )}
-            </div>
+          {/* Right Status Cluster - UNIFIED SignalR, Session, RAM Countdown & Actions */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#0c2340] border border-[#1d4ed8]/40 shadow-sm text-xs">
+              {/* SignalR status */}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#07172b] border border-slate-700/60 font-medium text-slate-300">
+                <Radio className="h-3.5 w-3.5 text-[#38bdf8]" />
+                <span className="font-semibold text-emerald-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  {signalRState}
+                </span>
+              </div>
 
-            <div className="flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/90 px-3 py-1.5 text-xs">
-              <Radio className="h-3.5 w-3.5 text-violet-400" />
-              <span className="font-mono text-slate-400">SignalR:</span>
-              <Badge
-                variant={
-                  signalRState === 'Connected'
-                    ? 'success'
-                    : signalRState === 'Connecting'
-                    ? 'warning'
-                    : 'neutral'
-                }
+              {/* Session type */}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#07172b] border border-slate-700/60 font-medium">
+                {sessionType === 'persistent' ? (
+                  <span className="text-emerald-400 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Duy trì (30 ngày)</span>
+                  </span>
+                ) : (
+                  <span className="text-amber-400 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Tạm thời (8h)</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Token live countdown */}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#07172b] border border-slate-700/60 font-mono font-medium text-[#38bdf8]">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#38bdf8]" />
+                <span>Phiên: {formatCountdown(timeToExpiry)}</span>
+              </div>
+
+              {/* Manual Refresh Action */}
+              <button
+                onClick={handleManualRefresh}
+                disabled={isRefreshingToken}
+                title="Làm mới phiên làm việc ngay lập tức"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#0052cc] hover:bg-[#0065ff] hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer disabled:opacity-50 shadow-sm"
               >
-                {signalRState}
-              </Badge>
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingToken ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Làm mới</span>
+              </button>
             </div>
 
-            <a
-              href={`${ENV.API_BASE_URL}/swagger`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-xs font-medium text-indigo-300 hover:bg-indigo-500/20"
-            >
-              <span>Swagger API</span>
-              <ExternalLink className="h-3 w-3" />
-            </a>
+            {refreshNotice && (
+              <span className="text-xs text-emerald-400 font-medium animate-in fade-in">
+                {refreshNotice}
+              </span>
+            )}
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsLoggedIn(false)}
-              title="Xem Trang Chủ 3D"
-              className="text-xs"
+            {/* Profile User Chip Button */}
+            <button
+              onClick={() => setActiveTab('profile')}
+              title="Xem hồ sơ cá nhân"
+              className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95 ${
+                activeTab === 'profile'
+                  ? 'bg-[#122e54] border-[#38bdf8] text-white shadow-sm'
+                  : 'bg-[#0c2340] border-[#1d4ed8]/40 text-slate-300 hover:bg-[#122e54] hover:text-white'
+              }`}
             >
-              <Sparkles className="h-3.5 w-3.5 text-sky-400" />
-              <span>Xem Trang 3D</span>
-            </Button>
+              <Avatar
+                name={currentUser?.fullName || "Enterprise User"}
+                src={currentUser?.avatarUrl}
+                size="xs"
+              />
+              <span className="max-w-[140px] truncate">{currentUser?.fullName || 'Hồ sơ cá nhân'}</span>
+            </button>
 
-            <Button variant="ghost" size="sm" onClick={handleLogout} title="Đăng xuất">
-              <LogOut className="h-4 w-4" />
-            </Button>
+            {/* Logout button */}
+            <button
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              title="Đăng xuất khỏi hệ thống"
+              className="h-9 w-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-rose-300 hover:bg-rose-950/40 border border-transparent hover:border-rose-500/30 transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95 disabled:opacity-50"
+            >
+              {isLoggingOut ? <RefreshCw className="h-4 w-4 animate-spin text-rose-400" /> : <LogOut className="h-4 w-4" />}
+            </button>
           </div>
         </header>
 
-        {/* Workspace Body */}
+        {/* Workspace Body: Dynamic View */}
         <main className="flex flex-1 overflow-hidden">
-          {/* Left Column: Conversations */}
-          <section className="w-80 border-r border-slate-800 bg-slate-900/30 p-4 flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
-                {activeTab === 'chat' && 'Cuộc hội thoại'}
-                {activeTab === 'contacts' && 'Danh bạ'}
-                {activeTab === 'calls' && 'Lịch sử cuộc gọi'}
-                {activeTab === 'remote' && 'Phiên hỗ trợ'}
-                {activeTab === 'admin' && 'Nhật ký bảo mật'}
-              </h2>
-              <Badge variant="neutral">5 Services Online</Badge>
-            </div>
-
-            <div className="flex-1 space-y-2 overflow-y-auto pr-1">
-              {[
-                { name: 'Kênh Thông Báo Chung', last: 'EnterpriseConnect System is Live', time: '10:12', unread: 2 },
-                { name: 'Nguyễn Văn An (Dev)', last: 'Đã test xong API Gateway HTTPS', time: '09:45', unread: 0 },
-                { name: 'Trần Thị Mai (QA)', last: '144 Unit Tests Passed', time: 'Hôm qua', unread: 0 },
-              ].map((c, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-3 rounded-xl p-3 hover:bg-slate-800/60 cursor-pointer transition-colors border border-transparent hover:border-slate-700/50"
-                >
-                  <Avatar name={c.name} size="md" status={i === 1 ? 'online' : 'offline'} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className="truncate text-sm font-medium text-slate-200">{c.name}</p>
-                      <span className="text-[11px] text-slate-500">{c.time}</span>
-                    </div>
-                    <p className="truncate text-xs text-slate-400">{c.last}</p>
-                  </div>
-                  {c.unread > 0 && <Badge variant="primary">{c.unread}</Badge>}
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Right Column: Chat Box */}
-          <section className="flex flex-1 flex-col bg-slate-950">
-            <div className="flex h-14 items-center justify-between border-b border-slate-800/80 px-6 bg-slate-900/20">
-              <div className="flex items-center gap-3">
-                <Avatar name="Kênh Thông Báo Chung" size="sm" status="online" />
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-200">Kênh Thông Báo Chung</h3>
-                  <p className="text-[11px] text-emerald-400 flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                    Kênh thời gian thực SignalR
-                  </p>
-                </div>
+          {activeTab === 'chat' && <EnterpriseChatModule />}
+          {activeTab === 'profile' && (
+            <UserProfileView
+              onBackToWorkspace={() => setActiveTab('chat')}
+              onLogout={handleLogout}
+              isLoggingOut={isLoggingOut}
+              onProfileUpdated={(updated) => setCurrentUser(updated)}
+            />
+          )}
+          {activeTab !== 'chat' && activeTab !== 'profile' && (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#071e3d] text-slate-300">
+              <div className="w-16 h-16 rounded-2xl bg-[#0c2340] border border-[#1d4ed8]/40 flex items-center justify-center text-[#38bdf8] mb-4 shadow-xl">
+                {activeTab === 'contacts' && <Users className="w-8 h-8" />}
+                {activeTab === 'calls' && <PhoneCall className="w-8 h-8" />}
+                {activeTab === 'remote' && <Monitor className="w-8 h-8" />}
+                {activeTab === 'admin' && <ShieldAlert className="w-8 h-8" />}
               </div>
-            </div>
-
-            <div className="flex-1 space-y-4 overflow-y-auto p-6">
-              {messages.map((m) => (
-                <div
-                  key={m.id}
-                  className={`flex flex-col ${m.sender === 'Tôi' ? 'items-end' : 'items-start'}`}
-                >
-                  <div className="flex items-center gap-2 mb-1 text-xs text-slate-400">
-                    <span className="font-semibold text-slate-300">{m.sender}</span>
-                    <span>{m.time}</span>
-                  </div>
-                  <div
-                    className={`max-w-md rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
-                      m.sender === 'Tôi'
-                        ? 'bg-indigo-600 text-white rounded-br-none'
-                        : 'bg-slate-800/90 text-slate-200 border border-slate-700/60 rounded-bl-none'
-                    }`}
-                  >
-                    {m.text}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="border-t border-slate-800 p-4 bg-slate-900/40">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSendMessage();
-                }}
-                className="flex items-center gap-3"
+              <h3 className="text-lg font-bold text-white mb-2">
+                {activeTab === 'contacts' && 'Danh Bạ Doanh Nghiệp Tập Trung'}
+                {activeTab === 'calls' && 'Hội Thoại & Video Call WebRTC'}
+                {activeTab === 'remote' && 'Hỗ Trợ Từ Xa & Điều Khiển Màn Hình'}
+                {activeTab === 'admin' && 'Trung Tâm Giám Sát An Ninh & Audit Forensics'}
+              </h3>
+              <p className="text-xs text-slate-400 max-w-md mb-6 leading-relaxed">
+                Module này đã được đặc tả luồng E2E và kết nối với các microservice chuyên biệt. Bấm vào tab "Nhắn tin & AI Copilot" để trải nghiệm module nhắn tin 3 cột hoàn chỉnh.
+              </p>
+              <button
+                onClick={() => setActiveTab('chat')}
+                className="px-5 py-2.5 rounded-lg bg-[#0052cc] hover:bg-[#0065ff] text-white font-bold text-xs shadow-md transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
               >
-                <Input
-                  value={inputMsg}
-                  onChange={(e) => setInputMsg(e.target.value)}
-                  placeholder="Nhập nội dung tin nhắn gửi vào hệ thống..."
-                  className="flex-1"
-                />
-                <Button type="submit" variant="primary" disabled={!inputMsg.trim()}>
-                  <Send className="h-4 w-4" />
-                  <span>Gửi</span>
-                </Button>
-              </form>
+                Mở Module Nhắn Tin Doanh Nghiệp & AI Copilot
+              </button>
             </div>
-          </section>
+          )}
         </main>
       </div>
     </div>

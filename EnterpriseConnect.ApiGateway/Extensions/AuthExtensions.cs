@@ -29,7 +29,7 @@ public static class AuthExtensions
                     ClockSkew = TimeSpan.FromMinutes(1)
                 };
 
-                // Hỗ trợ trích xuất token cho SignalR WebSockets và Swagger UI tự động nhận cả Bearer lẫn token trần
+                // Hỗ trợ trích xuất token cho SignalR WebSockets và chuẩn hóa header (chống lỗi Bearer lặp từ Swagger UI)
                 options.Events = new JwtBearerEvents
                 {
                     OnMessageReceived = context =>
@@ -39,14 +39,18 @@ public static class AuthExtensions
                         if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
                         {
                             context.Token = accessToken;
+                            return Task.CompletedTask;
                         }
-                        else
+
+                        var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+                        if (!string.IsNullOrEmpty(authHeader))
                         {
-                            var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
-                            if (!string.IsNullOrEmpty(authHeader) && !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                            var raw = authHeader.Trim();
+                            while (raw.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
                             {
-                                context.Token = authHeader.Trim();
+                                raw = raw.Substring(7).Trim();
                             }
+                            context.Token = raw;
                         }
                         return Task.CompletedTask;
                     }

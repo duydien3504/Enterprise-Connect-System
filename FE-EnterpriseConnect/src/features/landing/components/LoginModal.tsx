@@ -11,6 +11,7 @@ interface LoginModalProps {
 export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [email, setEmail] = useState('admin@enterprise.com');
   const [password, setPassword] = useState('Password123!');
+  const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,15 +23,24 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
     setError(null);
 
     try {
-      await authApi.login({ email, password });
+      // Calls POST /api/Auth/login with exact backend schema:
+      // { email, password, deviceType: 1, deviceInfo, ipAddress }
+      await authApi.login({
+        email,
+        password,
+        deviceType: 1, // Web
+        deviceInfo: typeof navigator !== 'undefined' ? navigator.userAgent : 'Enterprise Web Client',
+        ipAddress: '',
+        rememberMe,
+      });
+
       onSuccess();
       onClose();
     } catch (err: unknown) {
-      if (err && typeof err === 'object' && 'response' in err) {
-        const axErr = err as { response?: { status?: number } };
-        setError(`Đăng nhập thất bại (Mã ${axErr.response?.status || '500'}). Vui lòng kiểm tra lại tài khoản.`);
+      if (err instanceof Error) {
+        setError(err.message);
       } else {
-        setError('Không thể kết nối đến Gateway api.hugonef.id.vn');
+        setError('Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản và mật khẩu.');
       }
     } finally {
       setIsLoading(false);
@@ -67,11 +77,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
             Đăng nhập hệ thống
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Xác thực tài khoản điều hành doanh nghiệp tập trung
+            Xác thực tài khoản và khởi tạo phiên làm việc bảo mật
           </p>
         </div>
 
-        {/* Error notification */}
+        {/* Error notification from Backend */}
         {error && (
           <div className="mb-5 p-3 rounded-lg bg-[#3d1217] border border-rose-500/50 text-xs text-rose-200">
             {error}
@@ -132,13 +142,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
 
           {/* Remember session checkbox */}
           <div className="pt-1">
-            <label className="inline-flex items-center gap-2 cursor-pointer select-none text-xs text-slate-300">
+            <label className="inline-flex items-center gap-2.5 cursor-pointer select-none">
               <input
                 type="checkbox"
-                defaultChecked
-                className="w-3.5 h-3.5 rounded bg-[#07172b] border-slate-700 text-[#0052cc] focus:ring-0 cursor-pointer"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded bg-[#07172b] border border-slate-700 text-[#0052cc] focus:ring-0 cursor-pointer"
               />
-              <span>Ghi nhớ phiên đăng nhập trên thiết bị này</span>
+              <span className="text-xs font-medium text-slate-300">
+                Ghi nhớ phiên đăng nhập trên thiết bị này
+              </span>
             </label>
           </div>
 
@@ -155,7 +168,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
           </div>
         </form>
 
-        {/* Security Footer */}
+        {/* Minimal Enterprise Security Footer */}
         <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
           <ShieldCheck className="w-3.5 h-3.5 text-[#38bdf8]" />
           <span>Bảo mật Zero-Trust kết nối qua API Gateway</span>

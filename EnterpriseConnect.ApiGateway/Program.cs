@@ -4,6 +4,16 @@ using Yarp.ReverseProxy.Transforms;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure Kestrel & Form limits for file uploads / proxying (25MB)
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 25 * 1024 * 1024;
+});
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 25 * 1024 * 1024;
+});
+
 // 1. Service Registrations via Modules
 builder.Services.AddGatewayCors(builder.Configuration);
 builder.Services.AddGatewayRateLimiting();
