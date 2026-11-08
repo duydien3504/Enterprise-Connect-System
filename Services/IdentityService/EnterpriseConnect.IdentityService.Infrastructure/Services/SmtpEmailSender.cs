@@ -41,6 +41,7 @@ public class SmtpEmailSender : IEmailSender
             message.Body = bodyBuilder.ToMessageBody();
 
             using var client = new SmtpClient();
+            client.Timeout = 4000; // Giới hạn 4s timeout để tránh giữ kết nối vô thời hạn
             
             // Nếu không có host cấu hình thật hoặc đang test, log nội dung thay vì throw lỗi làm đứt flow
             if (string.IsNullOrEmpty(smtpUser) || smtpHost == "localhost")

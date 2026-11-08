@@ -70,7 +70,20 @@ public class RegisterUserCommandHandler : IRequestHandler<RegisterUserCommand, G
                 <p>Liên kết này có hiệu lực trong vòng 24 giờ.</p>
             </div>";
 
-        await _emailSender.SendEmailAsync(user.Email, "[Enterprise Connect] Xác thực email tài khoản", bodyHtml, cancellationToken);
+        // Non-blocking Background Email Dispatch: Trả response đăng ký ngay lập tức (<100ms)
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var emailCts = new CancellationTokenSource(TimeSpan.FromSeconds(6));
+                await _emailSender.SendEmailAsync(user.Email, "[Enterprise Connect] Xác thực email tài khoản", bodyHtml, emailCts.Token);
+            }
+            catch
+            {
+                // Logged in SmtpEmailSender
+            }
+        });
+
         return user.Id;
     }
 }

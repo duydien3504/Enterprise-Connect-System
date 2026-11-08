@@ -49,7 +49,20 @@ public class ForgotPasswordCommandHandler : IRequestHandler<ForgotPasswordComman
                 <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.</p>
             </div>";
 
-        await _emailSender.SendEmailAsync(request.Email, "[Enterprise Connect] Mã xác thực đặt lại mật khẩu", bodyHtml, cancellationToken);
+        // Non-blocking Background Email Dispatch: Trả response 200 OK ngay lập tức (<50ms)
+        // tránh giữ request gây ra 499 timeout do handshake SMTP mạng ngoài
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var emailCts = new CancellationTokenSource(TimeSpan.FromSeconds(6));
+                await _emailSender.SendEmailAsync(request.Email, "[Enterprise Connect] Mã xác thực đặt lại mật khẩu", bodyHtml, emailCts.Token);
+            }
+            catch
+            {
+                // Các lỗi gửi mail được log trong SmtpEmailSender
+            }
+        });
 
         return true;
     }
