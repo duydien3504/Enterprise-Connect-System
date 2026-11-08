@@ -289,6 +289,8 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+  const [logoutCountdown, setLogoutCountdown] = useState<number | null>(null);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const sessionType = tokenStorage.getSessionType();
   const timeToExpiry = tokenStorage.getTimeToExpiry();
@@ -375,6 +377,9 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
 
     return () => {
       isMounted = false;
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+      }
     };
   }, []);
 
@@ -625,8 +630,23 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
       setCurrentPassword('');
       setNewPassword('');
       setConfirmNewPassword('');
-      setNotice(`✓ ${successMsg}`);
-      setTimeout(() => setNotice(null), 5000);
+      setNotice(`✓ ${successMsg} Đang tự động đăng xuất an toàn...`);
+
+      // Zero-Trust Security Enforcement: Toàn bộ phiên làm việc cũ đã bị máy chủ thu hồi.
+      // Tự động đếm ngược 3 giây và đăng xuất đưa người dùng về màn hình đăng nhập.
+      setLogoutCountdown(3);
+      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+
+      countdownTimerRef.current = setInterval(() => {
+        setLogoutCountdown((prev) => {
+          if (prev === null || prev <= 1) {
+            if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+            onLogout();
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Đổi mật khẩu thất bại. Vui lòng kiểm tra lại.';
       setPasswordError(msg);
@@ -635,6 +655,14 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
     } finally {
       setIsChangingPassword(false);
     }
+  };
+
+  /**
+   * Cho phép người dùng bấm đăng xuất ngay lập tức mà không cần chờ hết 3 giây đếm ngược
+   */
+  const handleImmediateLogout = () => {
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    onLogout();
   };
 
   const handleResetPasswordForm = () => {
@@ -1160,14 +1188,15 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                       }}
                       placeholder="Nhập mật khẩu đang sử dụng..."
                       autoComplete="current-password"
-                      disabled={isChangingPassword}
+                      disabled={isChangingPassword || logoutCountdown !== null}
                       className="w-full bg-[#07172b] border border-[#1d4ed8]/30 rounded-xl pl-3.5 pr-10 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#38bdf8] focus:ring-1 focus:ring-[#38bdf8] transition-all disabled:opacity-50"
                     />
                     <button
                       type="button"
                       onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                       tabIndex={-1}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#38bdf8] transition-colors p-1"
+                      disabled={logoutCountdown !== null}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#38bdf8] transition-colors p-1 disabled:opacity-50"
                       title={showCurrentPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                     >
                       {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -1194,14 +1223,15 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                       }}
                       placeholder="Nhập mật khẩu mới (khác mật khẩu cũ)..."
                       autoComplete="new-password"
-                      disabled={isChangingPassword}
+                      disabled={isChangingPassword || logoutCountdown !== null}
                       className="w-full bg-[#07172b] border border-[#1d4ed8]/30 rounded-xl pl-3.5 pr-10 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#38bdf8] focus:ring-1 focus:ring-[#38bdf8] transition-all disabled:opacity-50"
                     />
                     <button
                       type="button"
                       onClick={() => setShowNewPassword(!showNewPassword)}
                       tabIndex={-1}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#38bdf8] transition-colors p-1"
+                      disabled={logoutCountdown !== null}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#38bdf8] transition-colors p-1 disabled:opacity-50"
                       title={showNewPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                     >
                       {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -1225,14 +1255,15 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                       }}
                       placeholder="Nhập lại mật khẩu mới..."
                       autoComplete="new-password"
-                      disabled={isChangingPassword}
+                      disabled={isChangingPassword || logoutCountdown !== null}
                       className="w-full bg-[#07172b] border border-[#1d4ed8]/30 rounded-xl pl-3.5 pr-10 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#38bdf8] focus:ring-1 focus:ring-[#38bdf8] transition-all disabled:opacity-50"
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       tabIndex={-1}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#38bdf8] transition-colors p-1"
+                      disabled={logoutCountdown !== null}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#38bdf8] transition-colors p-1 disabled:opacity-50"
                       title={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                     >
                       {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -1248,17 +1279,40 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
                   </div>
                 )}
 
-                {/* Success Banner */}
+                {/* Success Banner with Countdown and Immediate Logout button */}
                 {passwordSuccess && (
-                  <div className="p-3 rounded-xl bg-emerald-950/70 border border-emerald-500/40 flex items-start gap-2.5 text-xs text-emerald-300 animate-in fade-in">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>{passwordSuccess}</span>
+                  <div className="p-3.5 rounded-xl bg-emerald-950/80 border border-emerald-500/50 flex flex-col gap-2.5 text-xs text-emerald-200 animate-in fade-in">
+                    <div className="flex items-start gap-2.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <div className="space-y-1 flex-1">
+                        <span className="font-semibold text-emerald-300 block">{passwordSuccess}</span>
+                        <span className="text-[11px] text-emerald-400/90 block">
+                          Toàn bộ phiên làm việc cũ đã bị thu hồi theo tiêu chuẩn Zero-Trust. Vui lòng đăng nhập lại với mật khẩu mới.
+                        </span>
+                      </div>
+                    </div>
+
+                    {logoutCountdown !== null && (
+                      <div className="flex items-center justify-between pt-2 border-t border-emerald-500/30">
+                        <span className="text-[11px] text-emerald-300 flex items-center gap-1.5">
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                          <span>Tự động đăng xuất sau: <strong className="text-white font-mono text-xs">{logoutCountdown}s</strong></span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleImmediateLogout}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[11px] shadow-sm hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                        >
+                          Đăng xuất ngay
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {/* Form Action Buttons */}
                 <div className="flex items-center justify-end gap-3 pt-2 border-t border-[#1d4ed8]/20">
-                  {(currentPassword || newPassword || confirmNewPassword) && (
+                  {logoutCountdown === null && (currentPassword || newPassword || confirmNewPassword) && (
                     <button
                       type="button"
                       onClick={handleResetPasswordForm}
@@ -1271,10 +1325,15 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
 
                   <button
                     type="submit"
-                    disabled={isChangingPassword || !currentPassword || !newPassword || !confirmNewPassword}
+                    disabled={isChangingPassword || logoutCountdown !== null || !currentPassword || !newPassword || !confirmNewPassword}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0052cc] hover:bg-[#0065ff] text-white text-xs font-semibold hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                   >
-                    {isChangingPassword ? (
+                    {logoutCountdown !== null ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Đang chuyển hướng ({logoutCountdown}s)...</span>
+                      </>
+                    ) : isChangingPassword ? (
                       <>
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                         <span>Đang xử lý...</span>
