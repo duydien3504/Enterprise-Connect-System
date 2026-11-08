@@ -8,7 +8,15 @@ public static class AuthExtensions
 {
     public static IServiceCollection AddGatewayAuth(this IServiceCollection services, IConfiguration configuration)
     {
-        var secretKey = configuration["JwtSettings:Secret"] ?? "REDACTED_JWT_SECRET";
+        var secretKey = configuration["JwtSettings:Secret"]
+            ?? Environment.GetEnvironmentVariable("JwtSettings__Secret")
+            ?? Environment.GetEnvironmentVariable("JWT_SECRET");
+
+        if (string.IsNullOrWhiteSpace(secretKey))
+        {
+            throw new InvalidOperationException("Bảo mật Gateway: 'JwtSettings:Secret' không được cấu hình. Vui lòng thiết lập biến môi trường JwtSettings__Secret hoặc JWT_SECRET.");
+        }
+
         var issuer = configuration["JwtSettings:Issuer"] ?? "EnterpriseConnect.IdentityService";
         var audience = configuration["JwtSettings:Audience"] ?? "EnterpriseConnect.Clients";
 

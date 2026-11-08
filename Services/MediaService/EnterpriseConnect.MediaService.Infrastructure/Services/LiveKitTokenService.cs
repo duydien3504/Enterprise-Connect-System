@@ -14,12 +14,20 @@ public class LiveKitTokenService : ILiveKitTokenService
 
     public LiveKitTokenService(IConfiguration configuration)
     {
-        _apiKey = configuration["LiveKit:ApiKey"] ?? "devkey";
-        _apiSecret = configuration["LiveKit:ApiSecret"] ?? "REDACTED_LIVEKIT_SECRET";
+        _apiKey = configuration["LiveKit:ApiKey"]
+            ?? Environment.GetEnvironmentVariable("LiveKit__ApiKey")
+            ?? "devkey";
+        _apiSecret = configuration["LiveKit:ApiSecret"]
+            ?? Environment.GetEnvironmentVariable("LiveKit__ApiSecret")
+            ?? string.Empty;
     }
 
     public string GenerateJoinToken(string roomName, string identity, string name, bool canPublish = true, bool canSubscribe = true)
     {
+        if (string.IsNullOrWhiteSpace(_apiSecret))
+        {
+            throw new InvalidOperationException("LiveKit: Cấu hình 'LiveKit:ApiSecret' không được để trống khi tạo Join Token.");
+        }
         var tokenHandler = new JwtSecurityTokenHandler();
         var key = Encoding.UTF8.GetBytes(_apiSecret);
 

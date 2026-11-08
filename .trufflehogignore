@@ -1,3 +1,1 @@
-Services/AdminService/EnterpriseConnect.AdminService.Infrastructure/Services/CloudinaryStorageService.cs
-.*CloudinaryStorageService.*
-EnterpriseConnect.ApiGateway/appsettings.*
+# TruffleHog ignore file (empty - all secrets must be protected)

@@ -15,7 +15,7 @@ public class CloudinaryStorageService : ICloudinaryStorageService
     {
         _logger = logger;
 
-        // 1. Ưu tiên đọc từ IConfiguration, sau đó kiểm tra biến môi trường hệ thống
+        // 1. Đọc cấu hình từ IConfiguration và biến môi trường
         var cloudName = configuration["CloudinarySettings:CloudName"]
             ?? Environment.GetEnvironmentVariable("CloudinarySettings__CloudName")
             ?? Environment.GetEnvironmentVariable("CLOUDINARY_CLOUD_NAME");
@@ -28,18 +28,18 @@ public class CloudinaryStorageService : ICloudinaryStorageService
             ?? Environment.GetEnvironmentVariable("CloudinarySettings__ApiSecret")
             ?? Environment.GetEnvironmentVariable("CLOUDINARY_API_SECRET");
 
-        // 2. Fallback an toàn: Nếu môi trường chưa cấu hình biến môi trường hoặc mang giá trị placeholder "demo"
+        // 2. Fail-Fast: Tuyệt đối không hardcode credentials trong mã nguồn
         if (string.IsNullOrWhiteSpace(cloudName) || cloudName.Equals("demo", StringComparison.OrdinalIgnoreCase))
         {
-            cloudName = "REDACTED_CLOUD_NAME";
+            throw new InvalidOperationException("Cấu hình bắt buộc 'CloudinarySettings:CloudName' không được để trống hoặc dùng giá trị mặc định 'demo'. Vui lòng cấu hình biến môi trường.");
         }
         if (string.IsNullOrWhiteSpace(apiKey) || apiKey == "123456789")
         {
-            apiKey = "REDACTED_CLOUDINARY_KEY";
+            throw new InvalidOperationException("Cấu hình bắt buộc 'CloudinarySettings:ApiKey' không được để trống. Vui lòng cấu hình biến môi trường.");
         }
         if (string.IsNullOrWhiteSpace(apiSecret) || apiSecret == "dummy_secret")
         {
-            apiSecret = "REDACTED_CLOUDINARY_SECRET";
+            throw new InvalidOperationException("Cấu hình bắt buộc 'CloudinarySettings:ApiSecret' không được để trống. Vui lòng cấu hình biến môi trường.");
         }
 
         var account = new Account(cloudName, apiKey, apiSecret);

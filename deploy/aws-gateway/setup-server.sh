@@ -6,7 +6,12 @@
 
 set -euo pipefail
 
-GATEWAY_SECRET="${1:-REDACTED_GATEWAY_SECRET}"
+GATEWAY_SECRET="${1:-${GATEWAY_SHARED_SECRET:-}}"
+if [ -z "$GATEWAY_SECRET" ]; then
+  echo "Lỗi: Tham số GATEWAY_SECRET bắt buộc không được cung cấp."
+  echo "Cách dùng: ./setup-server.sh <YOUR_GATEWAY_SHARED_SECRET>"
+  exit 1
+fi
 IMAGE_NAME="${2:-enterpriseconnect-gateway:latest}"
 
 echo "=========================================================="

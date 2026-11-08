@@ -16,7 +16,13 @@ builder.Services.AddAdminInfrastructure(builder.Configuration);
 
 // 2. JWT Authentication
 var jwtKey = builder.Configuration["JwtSettings:Secret"]
-    ?? "REDACTED_JWT_SECRET";
+    ?? Environment.GetEnvironmentVariable("JwtSettings__Secret")
+    ?? Environment.GetEnvironmentVariable("JWT_SECRET");
+
+if (string.IsNullOrWhiteSpace(jwtKey))
+{
+    throw new InvalidOperationException("AdminService: Cấu hình 'JwtSettings:Secret' không được để trống.");
+}
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

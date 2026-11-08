@@ -78,28 +78,38 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Validate SSH Key Secret
+      - name: Validate Deployment Secrets
         run: |
           if [ -z "$SSH_KEY_VAL" ]; then
             echo "::error::Secret 'AWS_ENTERPRISE_CONNECTION_SECRET' hoặc 'EC2_SSH_KEY' chưa được cấu hình trong GitHub Secrets!"
             exit 1
           fi
-          echo "SSH Key secret is detected. Length: ${#SSH_KEY_VAL} characters."
           HEADER=$(echo "$SSH_KEY_VAL" | head -n 1)
           if [[ "$HEADER" != *"BEGIN"* ]]; then
             echo "::error::Khóa SSH phải bắt đầu bằng '-----BEGIN ... PRIVATE KEY-----'. Hãy kiểm tra lại ô Secret chỉ dán duy nhất nội dung file .pem, không dán kèm tên biến!"
             exit 1
           fi
+          if [ -z "$GATEWAY_SECRET_VAL" ]; then
+            echo "::error::Secret 'GATEWAY_SHARED_SECRET' chưa được cấu hình trong GitHub Secrets!"
+            exit 1
+          fi
+          if [ -z "$JWT_SECRET_VAL" ]; then
+            echo "::error::Secret 'JWT_SECRET' chưa được cấu hình trong GitHub Secrets!"
+            exit 1
+          fi
+          echo "All required deployment secrets are present."
         env:
           SSH_KEY_VAL: ${{ secrets.AWS_ENTERPRISE_CONNECTION_SECRET || secrets.EC2_SSH_KEY }}
+          GATEWAY_SECRET_VAL: ${{ secrets.GATEWAY_SHARED_SECRET }}
+          JWT_SECRET_VAL: ${{ secrets.JWT_SECRET }}
 
       - name: Deploy to AWS EC2 via Direct SSH & SCP
         env:
           SSH_KEY: ${{ secrets.AWS_ENTERPRISE_CONNECTION_SECRET || secrets.EC2_SSH_KEY }}
           EC2_HOST: ${{ secrets.EC2_HOST || '13.238.207.194' }}
           EC2_USER: ${{ secrets.EC2_USERNAME || 'ubuntu' }}
-          GATEWAY_SECRET: ${{ secrets.GATEWAY_SHARED_SECRET || 'REDACTED_GATEWAY_SECRET' }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET || 'REDACTED_JWT_SECRET' }}
+          GATEWAY_SECRET: ${{ secrets.GATEWAY_SHARED_SECRET }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
           set -euo pipefail
           SSH_OPTS="-i $HOME/.ssh/deploy_key -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 -o ServerAliveInterval=15"

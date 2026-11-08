@@ -19,7 +19,14 @@ builder.Services.AddMediaInfrastructure(builder.Configuration);
 builder.Services.AddEnterpriseHealthChecks();
 
 // 2. JWT Authentication & SignalR Token Support
-var jwtKey = builder.Configuration["JwtSettings:Secret"] ?? "REDACTED_JWT_SECRET";
+var jwtKey = builder.Configuration["JwtSettings:Secret"]
+    ?? Environment.GetEnvironmentVariable("JwtSettings__Secret")
+    ?? Environment.GetEnvironmentVariable("JWT_SECRET");
+
+if (string.IsNullOrWhiteSpace(jwtKey))
+{
+    throw new InvalidOperationException("MediaService: Cấu hình 'JwtSettings:Secret' không được để trống.");
+}
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {

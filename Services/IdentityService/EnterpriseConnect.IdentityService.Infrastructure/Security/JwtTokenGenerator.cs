@@ -23,7 +23,15 @@ public class JwtTokenGenerator : IJwtTokenGenerator
 
     public string GenerateAccessToken(User user, IEnumerable<string> roles, IEnumerable<string> permissions, IEnumerable<Guid>? roleIds)
     {
-        var secretKey = _configuration["JwtSettings:Secret"] ?? "REDACTED_JWT_SECRET";
+        var secretKey = _configuration["JwtSettings:Secret"]
+            ?? Environment.GetEnvironmentVariable("JwtSettings__Secret")
+            ?? Environment.GetEnvironmentVariable("JWT_SECRET");
+
+        if (string.IsNullOrWhiteSpace(secretKey))
+        {
+            throw new InvalidOperationException("IdentityService: Cấu hình bảo mật 'JwtSettings:Secret' không được để trống khi khởi tạo JWT.");
+        }
+
         var issuer = _configuration["JwtSettings:Issuer"] ?? "EnterpriseConnect.IdentityService";
         var audience = _configuration["JwtSettings:Audience"] ?? "EnterpriseConnect.Clients";
         var expiryMinutes = int.TryParse(_configuration["JwtSettings:ExpiryMinutes"], out var exp) ? exp : 60;

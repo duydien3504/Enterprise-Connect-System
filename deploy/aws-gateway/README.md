@@ -94,7 +94,7 @@ Trong cửa sổ terminal đen vừa mở ra, bạn dán (paste) lệnh sau rồ
 cat << 'EOF' > setup-server.sh
 #!/usr/bin/env bash
 set -euo pipefail
-GATEWAY_SECRET="REDACTED_GATEWAY_SECRET"
+GATEWAY_SECRET="${1:-YOUR_GATEWAY_SHARED_SECRET_HERE}"
 IMAGE_NAME="enterpriseconnect-gateway:latest"
 
 echo ">>> [1/4] Linux Kernel Hardening..."
