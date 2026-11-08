@@ -73,10 +73,11 @@ jobs:
     needs: security-and-build
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
 
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       - name: Validate SSH Key Secret
         run: |
           if [ -z "$SSH_KEY_VAL" ]; then
@@ -92,40 +93,57 @@ jobs:
         env:
           SSH_KEY_VAL: ${{ secrets.AWS_ENTERPRISE_CONNECTION_SECRET || secrets.EC2_SSH_KEY }}
 
-      - name: Deploy to AWS EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST || '13.238.207.194' }}
-          username: ${{ secrets.EC2_USERNAME || 'ubuntu' }}
-          key: ${{ secrets.AWS_ENTERPRISE_CONNECTION_SECRET || secrets.EC2_SSH_KEY }}
-          script_stop: true
-          script: |
-            echo ">>> [1/4] Pulling latest changes from repository..."
-            sudo git config --global --add safe.directory /opt/enterpriseconnect || true
-            if [ ! -d "/opt/enterpriseconnect/.git" ]; then
-              sudo git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git /opt/enterpriseconnect
-            else
-              cd /opt/enterpriseconnect
-              sudo git fetch https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git ${{ github.ref_name }}
-              sudo git reset --hard FETCH_HEAD
-            fi
+      - name: Deploy to AWS EC2 via Direct SSH & SCP
+        env:
+          SSH_KEY: ${{ secrets.AWS_ENTERPRISE_CONNECTION_SECRET || secrets.EC2_SSH_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST || '13.238.207.194' }}
+          EC2_USER: ${{ secrets.EC2_USERNAME || 'ubuntu' }}
+          GATEWAY_SECRET: ${{ secrets.GATEWAY_SHARED_SECRET || 'REDACTED_GATEWAY_SECRET' }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET || 'REDACTED_JWT_SECRET' }}
+        run: |
+          echo ">>> [1/5] Setting up secure SSH key..."
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-            echo ">>> [2/4] Injecting Zero-Leak secrets into /opt/enterpriseconnect/gateway/.env..."
+          echo ">>> [2/5] Packaging API Gateway source code (Zero-Git on EC2)..."
+          tar --exclude='.git' --exclude='bin' --exclude='obj' --exclude='node_modules' -czf /tmp/gateway.tar.gz \
+            EnterpriseConnect.ApiGateway \
+            BuildingBlocks 2>/dev/null || tar --exclude='.git' -czf /tmp/gateway.tar.gz EnterpriseConnect.ApiGateway
+
+          echo ">>> [3/5] Generating protected .env configuration..."
+          cat << 'ENV_EOF' > /tmp/gateway.env
+ASPNETCORE_ENVIRONMENT=Production
+ASPNETCORE_HTTP_PORTS=8080
+GATEWAY_SHARED_SECRET=${{ secrets.GATEWAY_SHARED_SECRET || 'REDACTED_GATEWAY_SECRET' }}
+Security__GatewaySharedSecret=${{ secrets.GATEWAY_SHARED_SECRET || 'REDACTED_GATEWAY_SECRET' }}
+JwtSettings__Secret=${{ secrets.JWT_SECRET || 'REDACTED_JWT_SECRET' }}
+ENV_EOF
+
+          echo ">>> [4/5] Transferring files directly to EC2 via SCP..."
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key /tmp/gateway.tar.gz ${EC2_USER}@${EC2_HOST}:/tmp/gateway.tar.gz
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key /tmp/gateway.env ${EC2_USER}@${EC2_HOST}:/tmp/gateway.env
+
+          echo ">>> [5/5] Executing deployment and smoke test on EC2..."
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ${EC2_USER}@${EC2_HOST} bash -s << 'REMOTE_EOF'
+            set -euo pipefail
+
+            echo ">>> Extracting source files into /opt/enterpriseconnect..."
+            sudo mkdir -p /opt/enterpriseconnect
+            sudo tar -xzf /tmp/gateway.tar.gz -C /opt/enterpriseconnect
+            rm -f /tmp/gateway.tar.gz
+
+            echo ">>> Deploying protected .env file..."
             sudo mkdir -p /opt/enterpriseconnect/gateway
-            sudo bash -c 'cat << "ENV_EOF" > /opt/enterpriseconnect/gateway/.env
-            ASPNETCORE_ENVIRONMENT=Production
-            ASPNETCORE_HTTP_PORTS=8080
-            GATEWAY_SHARED_SECRET=${{ secrets.GATEWAY_SHARED_SECRET || 'REDACTED_GATEWAY_SECRET' }}
-            Security__GatewaySharedSecret=${{ secrets.GATEWAY_SHARED_SECRET || 'REDACTED_GATEWAY_SECRET' }}
-            JwtSettings__Secret=${{ secrets.JWT_SECRET || 'REDACTED_JWT_SECRET' }}
-            ENV_EOF'
+            sudo mv /tmp/gateway.env /opt/enterpriseconnect/gateway/.env
             sudo chmod 600 /opt/enterpriseconnect/gateway/.env
 
-            echo ">>> [3/4] Rebuilding Docker image..."
+            echo ">>> Building API Gateway Docker image..."
             cd /opt/enterpriseconnect
             sudo docker build -f EnterpriseConnect.ApiGateway/Dockerfile -t enterpriseconnect-gateway:latest .
 
-            echo ">>> [4/4] Restarting container with protected env-file..."
+            echo ">>> Restarting container (bound to 127.0.0.1:8080 behind Nginx)..."
             sudo docker stop enterpriseconnect-api-gateway 2>/dev/null || true
             sudo docker rm enterpriseconnect-api-gateway 2>/dev/null || true
             sudo docker run -d \
@@ -145,3 +163,4 @@ jobs:
             echo "4. Remote Service: $(curl -s http://127.0.0.1:8080/remote/health/live | cut -c 1-60)..."
             echo "5. Admin Service: $(curl -s http://127.0.0.1:8080/admin/health/live | cut -c 1-60)..."
             echo "Deployment to AWS EC2 and End-to-End Routing completed successfully!"
+          REMOTE_EOF
