@@ -73,6 +73,8 @@ jobs:
     needs: security-and-build
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Validate SSH Key Secret
@@ -99,8 +101,14 @@ jobs:
           script_stop: true
           script: |
             echo ">>> [1/4] Pulling latest changes from repository..."
-            cd /opt/enterpriseconnect
-            sudo git pull origin main
+            sudo git config --global --add safe.directory /opt/enterpriseconnect || true
+            if [ ! -d "/opt/enterpriseconnect/.git" ]; then
+              sudo git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git /opt/enterpriseconnect
+            else
+              cd /opt/enterpriseconnect
+              sudo git fetch https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git ${{ github.ref_name }}
+              sudo git reset --hard FETCH_HEAD
+            fi
 
             echo ">>> [2/4] Injecting Zero-Leak secrets into /opt/enterpriseconnect/gateway/.env..."
             sudo mkdir -p /opt/enterpriseconnect/gateway
@@ -114,6 +122,7 @@ jobs:
             sudo chmod 600 /opt/enterpriseconnect/gateway/.env
 
             echo ">>> [3/4] Rebuilding Docker image..."
+            cd /opt/enterpriseconnect
             sudo docker build -f EnterpriseConnect.ApiGateway/Dockerfile -t enterpriseconnect-gateway:latest .
 
             echo ">>> [4/4] Restarting container with protected env-file..."
