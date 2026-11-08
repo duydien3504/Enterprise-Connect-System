@@ -22,6 +22,26 @@ public class UsersController : ControllerBase
         _currentUserService = currentUserService;
     }
 
+    /// <summary>
+    /// Lấy danh sách người dùng với 2 trường cốt lõi bắt buộc: Tên và Tên phòng ban.
+    /// Hỗ trợ lọc theo tên, phòng ban và phân trang.
+    /// Quyền sử dụng: Mọi người dùng đã đăng nhập (đã xác thực qua Access Token).
+    /// </summary>
+    [Authorize]
+    [HttpGet]
+    [ProducesResponseType(typeof(GetUsersResultDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetUsers(
+        [FromQuery] string? name,
+        [FromQuery] Guid? departmentId,
+        [FromQuery] string? departmentName,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _mediator.Send(new GetUsersListQuery(name, departmentId, departmentName, page, pageSize), cancellationToken);
+        return Ok(result);
+    }
+
     [Authorize]
     [HttpGet("profile")]
     [ProducesResponseType(typeof(UserProfileDto), StatusCodes.Status200OK)]

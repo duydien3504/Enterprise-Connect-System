@@ -1,5 +1,6 @@
 using EnterpriseConnect.BuildingBlocks.Infrastructure.Persistence;
 using EnterpriseConnect.IdentityService.Application.Common.Interfaces;
+using EnterpriseConnect.IdentityService.Application.Features.Users.DTOs;
 using EnterpriseConnect.IdentityService.Domain.Entities;
 using EnterpriseConnect.IdentityService.Domain.Enums;
 using EnterpriseConnect.IdentityService.Infrastructure.Persistence.Context;
@@ -86,6 +87,55 @@ public class UserRepository : EfRepository<User>, IUserRepository
                 u.AvatarUrl,
                 u.DepartmentId,
                 u.Department != null ? u.Department.DepartmentName : null
+            ))
+            .ToListAsync(cancellationToken);
+
+        return (users, totalCount);
+    }
+
+    public async Task<(IReadOnlyList<UserListItemDto> Items, int TotalCount)> GetUsersListAsync(
+        string? name,
+        Guid? departmentId,
+        string? departmentName,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbSet.AsNoTracking().Where(u => u.Status == UserStatus.Active && !u.IsDeleted);
+
+        if (departmentId.HasValue)
+        {
+            query = query.Where(u => u.DepartmentId == departmentId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(departmentName))
+        {
+            var deptTerm = departmentName.Trim().ToLower();
+            query = query.Where(u => u.Department != null && u.Department.DepartmentName.ToLower().Contains(deptTerm));
+        }
+
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            var nameTerm = name.Trim().ToLower();
+            query = query.Where(u => u.FullName.ToLower().Contains(nameTerm));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var users = await query
+            .Include(u => u.Department)
+            .OrderBy(u => u.FullName)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(u => new UserListItemDto(
+                u.Id,
+                u.FullName,
+                u.Department != null ? u.Department.DepartmentName : null,
+                u.DepartmentId,
+                u.Email,
+                u.Position,
+                u.AvatarUrl,
+                u.Phone
             ))
             .ToListAsync(cancellationToken);
 
