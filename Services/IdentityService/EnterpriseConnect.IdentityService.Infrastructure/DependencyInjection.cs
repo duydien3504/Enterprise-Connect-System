@@ -92,17 +92,19 @@ public static class DependencyInjection
         services.AddSingleton<IPublicUrlProvider, PublicUrlProvider>();
 
         // JWT Authentication Configuration
-        var secretKey = configuration["JwtSettings:Secret"]
+        var rawSecret = configuration["JwtSettings:Secret"]
             ?? Environment.GetEnvironmentVariable("JwtSettings__Secret")
             ?? Environment.GetEnvironmentVariable("JWT_SECRET");
+
+        var secretKey = rawSecret?.Trim('"', '\'', ' ');
 
         if (string.IsNullOrWhiteSpace(secretKey))
         {
             throw new InvalidOperationException("IdentityService: Cấu hình bảo mật 'JwtSettings:Secret' không được để trống. Vui lòng thiết lập biến môi trường JwtSettings__Secret.");
         }
 
-        var issuer = configuration["JwtSettings:Issuer"] ?? "EnterpriseConnect.IdentityService";
-        var audience = configuration["JwtSettings:Audience"] ?? "EnterpriseConnect.Clients";
+        var issuer = (configuration["JwtSettings:Issuer"] ?? "EnterpriseConnect.IdentityService").Trim('"', '\'', ' ');
+        var audience = (configuration["JwtSettings:Audience"] ?? "EnterpriseConnect.Clients").Trim('"', '\'', ' ');
 
         services.AddAuthentication(options =>
         {
