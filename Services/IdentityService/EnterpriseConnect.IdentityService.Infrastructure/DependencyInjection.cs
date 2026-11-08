@@ -67,7 +67,26 @@ public static class DependencyInjection
         }
 
         services.AddScoped<ICacheService, DistributedCacheService>();
-        services.AddScoped<IEmailSender, SmtpEmailSender>();
+        services.AddScoped<ResendEmailSender>();
+        services.AddScoped<SmtpEmailSender>();
+        services.AddScoped<IEmailSender>(sp =>
+        {
+            var config = sp.GetRequiredService<IConfiguration>();
+            var resendKey = config["ResendSettings:ApiKey"]?.Trim('"', '\'', ' ');
+            if (!string.IsNullOrWhiteSpace(resendKey) && !resendKey.Contains("YOUR_RESEND_API_KEY"))
+            {
+                return sp.GetRequiredService<ResendEmailSender>();
+            }
+
+            var smtpUser = config["SmtpSettings:Username"]?.Trim('"', '\'', ' ');
+            var smtpHost = config["SmtpSettings:Host"]?.Trim('"', '\'', ' ');
+            if (!string.IsNullOrWhiteSpace(smtpUser) && !string.IsNullOrWhiteSpace(smtpHost) && smtpHost != "localhost")
+            {
+                return sp.GetRequiredService<SmtpEmailSender>();
+            }
+
+            return sp.GetRequiredService<ResendEmailSender>();
+        });
         services.AddScoped<ICloudinaryStorageService, CloudinaryStorageService>();
         services.AddScoped<IImageValidator, ImageSharpValidator>();
         services.AddSingleton<IPublicUrlProvider, PublicUrlProvider>();

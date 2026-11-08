@@ -49,10 +49,17 @@ public class ExtendedAuthCommandHandlersTests
                 savedOtp = v;
             });
 
+        var emailSentTcs = new TaskCompletionSource<bool>();
+        _emailSenderMock
+            .Setup(e => e.SendEmailAsync(email, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback(() => emailSentTcs.TrySetResult(true))
+            .Returns(Task.CompletedTask);
+
         var handler = new ForgotPasswordCommandHandler(_uowMock.Object, _cacheServiceMock.Object, _emailSenderMock.Object);
 
         // Act
         var result = await handler.Handle(new ForgotPasswordCommand(email), CancellationToken.None);
+        await Task.WhenAny(emailSentTcs.Task, Task.Delay(500));
 
         // Assert
         result.Should().BeTrue();
@@ -156,6 +163,12 @@ public class ExtendedAuthCommandHandlersTests
         var publicUrlMock = new Mock<IPublicUrlProvider>();
         publicUrlMock.Setup(p => p.IdentityBaseUrl).Returns("https://localhost:7272/identity");
 
+        var emailSentTcs = new TaskCompletionSource<bool>();
+        _emailSenderMock
+            .Setup(e => e.SendEmailAsync(email, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback(() => emailSentTcs.TrySetResult(true))
+            .Returns(Task.CompletedTask);
+
         var handler = new RegisterUserCommandHandler(
             _uowMock.Object,
             _passwordHasherMock.Object,
@@ -166,6 +179,7 @@ public class ExtendedAuthCommandHandlersTests
         // Act
         var command = new RegisterUserCommand(email, "Password123@", "New User", null, "Dev", "0123456789");
         var result = await handler.Handle(command, CancellationToken.None);
+        await Task.WhenAny(emailSentTcs.Task, Task.Delay(500));
 
         // Assert
         result.Should().NotBeEmpty();
