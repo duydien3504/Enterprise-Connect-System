@@ -40,14 +40,25 @@ public static class DependencyInjection
         services.AddHttpContextAccessor();
 
         // Extended Services: Caching, Email, Cloudinary & Image Validation
+        services.AddMemoryCache(); // Register local memory cache for resilience fallback
+
         var redisConn = configuration.GetConnectionString("Redis") ?? configuration["RedisSettings:ConnectionString"];
         if (!string.IsNullOrEmpty(redisConn))
         {
-            services.AddStackExchangeRedisCache(options =>
+            try
             {
-                options.Configuration = redisConn;
-                options.InstanceName = "EnterpriseConnect:";
-            });
+                var redisConfig = ParseRedisConfiguration(redisConn);
+                services.AddStackExchangeRedisCache(options =>
+                {
+                    options.ConfigurationOptions = redisConfig;
+                    options.InstanceName = "EnterpriseConnect:";
+                });
+            }
+            catch
+            {
+                // Fallback in-memory distributed cache khi Redis cấu hình không hợp lệ
+                services.AddDistributedMemoryCache();
+            }
         }
         else
         {
@@ -125,5 +136,54 @@ public static class DependencyInjection
         services.AddAuthorization();
 
         return services;
+    }
+
+    private static StackExchange.Redis.ConfigurationOptions ParseRedisConfiguration(string connectionString)
+    {
+        connectionString = connectionString.Trim();
+        if (connectionString.StartsWith("redis://", StringComparison.OrdinalIgnoreCase) ||
+            connectionString.StartsWith("rediss://", StringComparison.OrdinalIgnoreCase))
+        {
+            var uri = new Uri(connectionString);
+            var isSsl = uri.Scheme.Equals("rediss", StringComparison.OrdinalIgnoreCase);
+            var port = uri.Port > 0 ? uri.Port : (isSsl ? 6380 : 6379);
+
+            var config = new StackExchange.Redis.ConfigurationOptions
+            {
+                EndPoints = { { uri.Host, port } },
+                Ssl = isSsl,
+                AbortOnConnectFail = false,
+                ConnectTimeout = 3000,
+                SyncTimeout = 3000,
+                AsyncTimeout = 3000,
+                ConnectRetry = 2
+            };
+
+            if (!string.IsNullOrEmpty(uri.UserInfo))
+            {
+                var parts = uri.UserInfo.Split(':', 2);
+                if (parts.Length > 0 && !string.IsNullOrEmpty(parts[0]) && !parts[0].Equals("default", StringComparison.OrdinalIgnoreCase))
+                {
+                    config.User = parts[0];
+                }
+                if (parts.Length > 1 && !string.IsNullOrEmpty(parts[1]))
+                {
+                    config.Password = parts[1];
+                }
+                else if (parts.Length == 1 && !string.IsNullOrEmpty(parts[0]))
+                {
+                    config.Password = parts[0];
+                }
+            }
+
+            return config;
+        }
+
+        var standardConfig = StackExchange.Redis.ConfigurationOptions.Parse(connectionString);
+        standardConfig.AbortOnConnectFail = false;
+        standardConfig.ConnectTimeout = 3000;
+        standardConfig.SyncTimeout = 3000;
+        standardConfig.AsyncTimeout = 3000;
+        return standardConfig;
     }
 }

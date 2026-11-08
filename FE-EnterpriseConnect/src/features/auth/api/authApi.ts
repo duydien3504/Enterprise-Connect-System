@@ -16,6 +16,8 @@ import {
   type UploadAvatarResponse,
   type ChangePasswordRequest,
   type ChangePasswordResponse,
+  type ForgotPasswordRequest,
+  type ResetPasswordRequest,
 } from '../types/auth.types';
 
 export const authApi = {
@@ -484,6 +486,82 @@ export const authApi = {
       if (axios.isAxiosError(err)) {
         const resData = err.response?.data;
         let msg = 'Đổi mật khẩu thất bại.';
+        if (typeof resData === 'string' && resData.trim()) {
+          msg = resData;
+        } else if (resData?.detail) {
+          msg = resData.detail;
+        } else if (resData?.message) {
+          msg = resData.message;
+        } else if (resData?.errors) {
+          if (Array.isArray(resData.errors)) {
+            msg = resData.errors.join(', ');
+          } else if (typeof resData.errors === 'object') {
+            const msgs = Object.values(resData.errors).flat();
+            if (msgs.length > 0) msg = msgs.join(', ');
+          }
+        } else if (resData?.title) {
+          msg = resData.title;
+        }
+        throw new Error(msg);
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * Calls POST /api/Auth/forgot-password
+   * Request Body: { email: string }
+   * Response: 200 OK { message: string }
+   */
+  forgotPassword: async (emailOrRequest: string | ForgotPasswordRequest): Promise<{ message: string }> => {
+    const email = typeof emailOrRequest === 'string' ? emailOrRequest : emailOrRequest.email;
+    try {
+      const { data } = await apiClient.post<{ message: string }>(
+        API_ENDPOINTS.AUTH.FORGOT_PASSWORD,
+        { email: email.trim() }
+      );
+      return data;
+    } catch (err: unknown) {
+      console.error('[authApi] POST /api/Auth/forgot-password error:', err);
+      if (axios.isAxiosError(err)) {
+        const resData = err.response?.data;
+        let msg = 'Không thể gửi yêu cầu đặt lại mật khẩu.';
+        if (typeof resData === 'string' && resData.trim()) {
+          msg = resData;
+        } else if (resData?.detail) {
+          msg = resData.detail;
+        } else if (resData?.message) {
+          msg = resData.message;
+        } else if (resData?.title) {
+          msg = resData.title;
+        }
+        throw new Error(msg);
+      }
+      throw err;
+    }
+  },
+
+  /**
+   * Calls POST /api/Auth/reset-password
+   * Request Body: { email: string, otp: string, newPassword: string }
+   * Response: 200 OK { message: string }
+   */
+  resetPassword: async (request: ResetPasswordRequest): Promise<{ message: string }> => {
+    try {
+      const { data } = await apiClient.post<{ message: string }>(
+        API_ENDPOINTS.AUTH.RESET_PASSWORD,
+        {
+          email: request.email.trim(),
+          otp: request.otp.trim(),
+          newPassword: request.newPassword,
+        }
+      );
+      return data;
+    } catch (err: unknown) {
+      console.error('[authApi] POST /api/Auth/reset-password error:', err);
+      if (axios.isAxiosError(err)) {
+        const resData = err.response?.data;
+        let msg = 'Đặt lại mật khẩu thất bại.';
         if (typeof resData === 'string' && resData.trim()) {
           msg = resData;
         } else if (resData?.detail) {
