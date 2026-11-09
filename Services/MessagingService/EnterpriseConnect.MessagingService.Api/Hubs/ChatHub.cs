@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using EnterpriseConnect.MessagingService.Application.Common.Interfaces;
 using EnterpriseConnect.MessagingService.Application.Features.Messages.Commands;
 using EnterpriseConnect.MessagingService.Domain.Enums;
 using MediatR;
@@ -11,10 +12,36 @@ namespace EnterpriseConnect.MessagingService.Api.Hubs;
 public class ChatHub : Hub<IChatClient>
 {
     private readonly IMediator _mediator;
+    private readonly IMessagingUnitOfWork _uow;
 
-    public ChatHub(IMediator mediator)
+    public ChatHub(IMediator mediator, IMessagingUnitOfWork uow)
     {
         _mediator = mediator;
+        _uow = uow;
+    }
+
+    public override async Task OnConnectedAsync()
+    {
+        var userId = GetCurrentUserId();
+        if (userId != Guid.Empty)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId}");
+
+            try
+            {
+                var conversations = await _uow.Conversations.GetUserConversationsAsync(userId, Context.ConnectionAborted);
+                foreach (var conv in conversations)
+                {
+                    await Groups.AddToGroupAsync(Context.ConnectionId, conv.Id.ToString());
+                }
+            }
+            catch
+            {
+                // Non-fatal if initial fetch fails
+            }
+        }
+
+        await base.OnConnectedAsync();
     }
 
     public async Task JoinConversation(Guid conversationId)

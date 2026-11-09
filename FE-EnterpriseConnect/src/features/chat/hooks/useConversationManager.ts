@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { chatApi } from '../api/chatApi';
 import { userResolver } from '../api/userResolver';
 import { tokenStorage } from '@/core/storage/tokenStorage';
+import { signalRManager } from '@/core/signalr/signalRManager';
 import type {
   ConversationItemDto,
   ConversationMemberDto,
@@ -226,6 +227,11 @@ export function useConversationManager(initialTargetUserId?: string | null) {
 
       setConversations(uniqueList);
 
+      // Join all user conversation groups on SignalR
+      uniqueList.forEach((c) => {
+        signalRManager.joinConversation(c.id);
+      });
+
       // Select conversation
       if (uniqueList.length > 0) {
         setActiveConversationId((prev) => {
@@ -245,9 +251,122 @@ export function useConversationManager(initialTargetUserId?: string | null) {
     loadConversations();
   }, [loadConversations]);
 
-  // When active conversation changes, load members and messages if not cached
+  // Realtime SignalR Listeners for incoming messages and typing events
+  const [typingUser, setTypingUser] = useState<{ conversationId: string; userId: string; name: string } | null>(null);
+
+  useEffect(() => {
+    const unsubscribeMsg = signalRManager.onReceiveMessage(async (msg: MessageDto) => {
+      console.log('[SignalR] Received realtime message:', msg);
+      const isSelf = Boolean(currentUserId && msg.senderId.toLowerCase() === currentUserId.toLowerCase());
+
+      let senderName = isSelf ? 'Tôi' : 'Đồng nghiệp';
+      let senderAvatar: string | undefined = undefined;
+
+      if (!isSelf) {
+        try {
+          const partner = await userResolver.resolveUser(msg.senderId);
+          senderName = partner.fullName;
+          senderAvatar = partner.avatarUrl ?? undefined;
+        } catch {
+          // fallback
+        }
+      } else {
+        senderAvatar = currentUser?.avatarUrl ?? undefined;
+      }
+
+      const formattedMsg: Message = {
+        id: msg.id,
+        conversationId: msg.conversationId,
+        senderId: msg.senderId,
+        senderName,
+        senderAvatar,
+        content: msg.content,
+        createdAt: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isSelf,
+        isPinned: msg.isPinned,
+        type: msg.type,
+        status: msg.status,
+      };
+
+      // 1. Update messages map
+      setMessagesMap((prev) => {
+        const currentList = prev[msg.conversationId] || [];
+        if (currentList.some((m) => m.id === msg.id)) {
+          return prev;
+        }
+        const filtered = currentList.filter(
+          (m) => !(m.id.startsWith('temp-') && m.content === msg.content)
+        );
+        return {
+          ...prev,
+          [msg.conversationId]: [...filtered, formattedMsg],
+        };
+      });
+
+      // 2. Update conversations list in sidebar
+      setConversations((prev) => {
+        const exists = prev.some((c) => c.id === msg.conversationId);
+        if (!exists) {
+          loadConversations();
+          return prev;
+        }
+
+        const updated = prev.map((c) => {
+          if (c.id === msg.conversationId) {
+            return {
+              ...c,
+              lastMessage: msg.content,
+              lastMessageAt: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            };
+          }
+          return c;
+        });
+
+        return [...updated].sort((a, b) => {
+          if (a.id === msg.conversationId) return -1;
+          if (b.id === msg.conversationId) return 1;
+          return 0;
+        });
+      });
+    });
+
+    const unsubscribeTyping = signalRManager.onUserTyping(async (convId, userId, isTyping) => {
+      if (currentUserId && userId.toLowerCase() === currentUserId.toLowerCase()) return;
+
+      if (isTyping) {
+        try {
+          const partner = await userResolver.resolveUser(userId);
+          setTypingUser({ conversationId: convId, userId, name: partner.fullName });
+        } catch {
+          setTypingUser({ conversationId: convId, userId, name: 'Đồng nghiệp' });
+        }
+      } else {
+        setTypingUser((prev) => (prev?.userId.toLowerCase() === userId.toLowerCase() ? null : prev));
+      }
+    });
+
+    const unsubscribeToxic = signalRManager.onToxicWarning((warning) => {
+      setFeedback({ type: 'error', text: warning });
+    });
+
+    return () => {
+      unsubscribeMsg();
+      unsubscribeTyping();
+      unsubscribeToxic();
+    };
+  }, [currentUserId, currentUser, loadConversations]);
+
+  const activeTypingName = useMemo(() => {
+    if (typingUser && activeConversationId && typingUser.conversationId.toLowerCase() === activeConversationId.toLowerCase()) {
+      return typingUser.name;
+    }
+    return null;
+  }, [typingUser, activeConversationId]);
+
+  // When active conversation changes, join its SignalR group and load members and messages if not cached
   useEffect(() => {
     if (activeConversationId) {
+      signalRManager.joinConversation(activeConversationId);
       if (!membersMap[activeConversationId]) {
         loadMembers(activeConversationId);
       }
@@ -261,6 +380,7 @@ export function useConversationManager(initialTargetUserId?: string | null) {
   const selectConversation = useCallback(
     (id: string) => {
       setActiveConversationId(id);
+      signalRManager.joinConversation(id);
       loadMembers(id);
       loadMessages(id);
     },
@@ -371,6 +491,25 @@ export function useConversationManager(initialTargetUserId?: string | null) {
         [activeConversationId]: [...(prev[activeConversationId] || []), optimisticMsg],
       }));
 
+      // Immediately update sidebar for sender
+      setConversations((prev) => {
+        const updated = prev.map((c) => {
+          if (c.id === activeConversationId) {
+            return {
+              ...c,
+              lastMessage: trimmedContent,
+              lastMessageAt: nowTime,
+            };
+          }
+          return c;
+        });
+        return [...updated].sort((a, b) => {
+          if (a.id === activeConversationId) return -1;
+          if (b.id === activeConversationId) return 1;
+          return 0;
+        });
+      });
+
       try {
         const result = await chatApi.sendMessage({
           conversationId: activeConversationId,
@@ -406,8 +545,30 @@ export function useConversationManager(initialTargetUserId?: string | null) {
           return;
         }
 
-        // Successfully sent: reload messages from server
-        await loadMessages(activeConversationId);
+        // Successfully sent: replace optimistic temp message with real server message
+        if (result.message) {
+          const serverMsg: Message = {
+            id: result.message.id,
+            conversationId: result.message.conversationId,
+            senderId: result.message.senderId,
+            senderName: 'Tôi',
+            senderAvatar: currentUser?.avatarUrl,
+            content: result.message.content,
+            createdAt: new Date(result.message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isSelf: true,
+            isPinned: result.message.isPinned,
+            type: result.message.type,
+            status: result.message.status,
+          };
+          setMessagesMap((prev) => ({
+            ...prev,
+            [activeConversationId]: (prev[activeConversationId] || [])
+              .filter((m) => m.id !== tempId && m.id !== serverMsg.id)
+              .concat(serverMsg),
+          }));
+        } else {
+          await loadMessages(activeConversationId);
+        }
       } catch (err: any) {
         setMessagesMap((prev) => ({
           ...prev,
@@ -536,6 +697,7 @@ export function useConversationManager(initialTargetUserId?: string | null) {
     activeMessages,
     activePinnedMessages,
     activeSummary,
+    activeTypingName,
     isLoadingConversations,
     isLoadingMessages,
     isLoadingMembers,

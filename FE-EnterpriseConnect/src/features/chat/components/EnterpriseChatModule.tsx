@@ -23,6 +23,7 @@ export const EnterpriseChatModule: React.FC<EnterpriseChatModuleProps> = ({
     activeMessages,
     activePinnedMessages,
     activeSummary,
+    activeTypingName,
     isLoadingConversations,
     isLoadingMessages,
     isLoadingMembers,
@@ -172,6 +173,7 @@ export const EnterpriseChatModule: React.FC<EnterpriseChatModuleProps> = ({
           conversation={activeConversation}
           messages={activeMessages}
           isLoadingMessages={isLoadingMessages}
+          activeTypingName={activeTypingName}
           pinnedMessages={activePinnedMessages}
           isDrawerOpen={isDrawerOpen}
           onToggleDrawer={() => setIsDrawerOpen(!isDrawerOpen)}

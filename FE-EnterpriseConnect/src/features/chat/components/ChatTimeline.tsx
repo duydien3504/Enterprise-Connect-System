@@ -17,12 +17,14 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { Avatar } from '@/shared/components/Avatar';
+import { signalRManager } from '@/core/signalr/signalRManager';
 import type { Conversation, Message, MessageAttachment } from '../types/chat.types';
 
 interface ChatTimelineProps {
   conversation: Conversation;
   messages: Message[];
   isLoadingMessages?: boolean;
+  activeTypingName?: string | null;
   pinnedMessages?: Message[];
   isDrawerOpen: boolean;
   onToggleDrawer: () => void;
@@ -39,6 +41,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
   conversation,
   messages,
   isLoadingMessages = false,
+  activeTypingName = null,
   pinnedMessages = [],
   isDrawerOpen,
   onToggleDrawer,
@@ -53,29 +56,39 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
   const [showEmojiBar, setShowEmojiBar] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
   const [showPinnedBanner, setShowPinnedBanner] = useState(true);
-  const [isTypingSimulated, setIsTypingSimulated] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto scroll to latest message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isTypingSimulated]);
-
-  // Simulate typing indicator occasionally for realistic enterprise demo
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsTypingSimulated(true);
-      setTimeout(() => setIsTypingSimulated(false), 4000);
-    }, 8000);
-    return () => clearTimeout(timer);
-  }, [conversation.id]);
+  }, [messages, activeTypingName]);
 
   const pinnedMessage = pinnedMessages?.[0] || messages.find((m) => m.isPinned);
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputText(e.target.value);
+    if (conversation.id && conversation.id !== 'empty') {
+      signalRManager.sendTyping(conversation.id, true);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        signalRManager.sendTyping(conversation.id, false);
+      }, 2500);
+    }
+  };
 
   const handleSend = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!inputText.trim() && pendingAttachments.length === 0) return;
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    if (conversation.id && conversation.id !== 'empty') {
+      signalRManager.sendTyping(conversation.id, false);
+    }
 
     onSendMessage(
       inputText.trim(),
@@ -450,11 +463,11 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
           );
         }))}
 
-        {/* 4. Typing Indicator */}
-        {isTypingSimulated && (
+        {/* 4. Realtime Typing Indicator */}
+        {activeTypingName && (
           <div className="flex items-center gap-2 text-xs text-slate-300 animate-pulse py-1">
             <span className="w-2 h-2 rounded-full bg-[#38bdf8]" />
-            <span>Lê Thị Thảo (DevSecOps) đang soạn tin...</span>
+            <span>{activeTypingName} đang soạn tin...</span>
           </div>
         )}
 
@@ -553,7 +566,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
             <textarea
               rows={1}
               value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
+              onChange={handleTextareaChange}
               onKeyDown={handleKeyDown}
               placeholder="Nhập tin nhắn nội bộ bảo mật... (Enter gửi, Shift+Enter xuống dòng)"
               className="flex-1 bg-transparent border-0 text-white placeholder-slate-400 text-sm focus:outline-none resize-none max-h-32 py-2 px-1 leading-relaxed"

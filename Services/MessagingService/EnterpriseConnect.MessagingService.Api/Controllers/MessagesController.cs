@@ -1,3 +1,4 @@
+using EnterpriseConnect.MessagingService.Api.Hubs;
 using EnterpriseConnect.MessagingService.Api.Models;
 using EnterpriseConnect.MessagingService.Application.Common.Interfaces;
 using EnterpriseConnect.MessagingService.Application.Features.Messages.Commands;
@@ -6,6 +7,7 @@ using EnterpriseConnect.MessagingService.Application.Features.Messages.Queries;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 
 namespace EnterpriseConnect.MessagingService.Api.Controllers;
 
@@ -17,15 +19,18 @@ public class MessagesController : ControllerBase
     private readonly IMediator _mediator;
     private readonly IToxicDetectionService _toxicService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IHubContext<ChatHub, IChatClient> _hubContext;
 
     public MessagesController(
         IMediator mediator, 
         IToxicDetectionService toxicService,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IHubContext<ChatHub, IChatClient> hubContext)
     {
         _mediator = mediator;
         _toxicService = toxicService;
         _currentUserService = currentUserService;
+        _hubContext = hubContext;
     }
 
     [HttpPost]
@@ -40,6 +45,12 @@ public class MessagesController : ControllerBase
         {
             return BadRequest(new { message = $"Tin nhắn bị chặn: {result.ToxicReason}" });
         }
+
+        if (result.Message != null)
+        {
+            await _hubContext.Clients.Group(request.ConversationId.ToString()).ReceiveMessage(result.Message);
+        }
+
         return Ok(result);
     }
 
