@@ -198,6 +198,9 @@ export function useContactsManager() {
         text: fullName ? `Đã chặn ${fullName}.` : 'Đã chặn người dùng.',
       });
       await loadContacts();
+      if (directoryUsers.length > 0) {
+        await loadDirectoryUsers(directorySearchQuery, directoryDeptFilter, directoryPage);
+      }
     } catch {
       setFeedback({ type: 'error', text: 'Không thể chặn người dùng. Vui lòng thử lại.' });
     } finally {
@@ -214,6 +217,9 @@ export function useContactsManager() {
         text: fullName ? `Đã bỏ chặn ${fullName}.` : 'Đã bỏ chặn thành công.',
       });
       await loadContacts();
+      if (directoryUsers.length > 0) {
+        await loadDirectoryUsers(directorySearchQuery, directoryDeptFilter, directoryPage);
+      }
     } catch {
       setFeedback({ type: 'error', text: 'Không thể bỏ chặn người dùng. Vui lòng thử lại.' });
     } finally {
@@ -257,3 +263,4 @@ export function useContactsManager() {
     handleUnblockUser,
   };
 }
+

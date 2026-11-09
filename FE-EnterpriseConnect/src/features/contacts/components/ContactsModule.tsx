@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Users,
   UserCheck,
@@ -13,6 +13,7 @@ import { AcceptedContactsView } from './AcceptedContactsView';
 import { PendingRequestsView } from './PendingRequestsView';
 import { UserDirectoryView } from './UserDirectoryView';
 import { BlockedUsersView } from './BlockedUsersView';
+import { BlockConfirmModal } from './BlockConfirmModal';
 
 interface ContactsModuleProps {
   onStartChat: (userId: string) => void;
@@ -52,6 +53,35 @@ export const ContactsModule: React.FC<ContactsModuleProps> = ({ onStartChat }) =
     handleBlockUser,
     handleUnblockUser,
   } = useContactsManager();
+
+  // Block / Unblock Confirmation Modal state
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    type: 'block' | 'unblock';
+    targetUser: { id: string; fullName: string } | null;
+  }>({
+    isOpen: false,
+    type: 'block',
+    targetUser: null,
+  });
+
+  const handleOpenBlockModal = (id: string, fullName: string) => {
+    setModalState({ isOpen: true, type: 'block', targetUser: { id, fullName } });
+  };
+
+  const handleOpenUnblockModal = (id: string, fullName: string) => {
+    setModalState({ isOpen: true, type: 'unblock', targetUser: { id, fullName } });
+  };
+
+  const handleConfirmModal = async () => {
+    if (!modalState.targetUser) return;
+    if (modalState.type === 'block') {
+      await handleBlockUser(modalState.targetUser.id, modalState.targetUser.fullName);
+    } else {
+      await handleUnblockUser(modalState.targetUser.id, modalState.targetUser.fullName);
+    }
+    setModalState({ isOpen: false, type: 'block', targetUser: null });
+  };
 
   return (
     <div className="flex flex-1 h-full overflow-hidden bg-[#071e3d]">
@@ -208,7 +238,7 @@ export const ContactsModule: React.FC<ContactsModuleProps> = ({ onStartChat }) =
             actionLoadingId={actionLoadingId}
             onStartChat={onStartChat}
             onRemoveContact={handleRemoveContact}
-            onBlockUser={handleBlockUser}
+            onBlockUser={handleOpenBlockModal}
             onGoToDirectory={() => setActiveSubTab('directory')}
             onRefresh={loadContacts}
           />
@@ -248,7 +278,8 @@ export const ContactsModule: React.FC<ContactsModuleProps> = ({ onStartChat }) =
             onSendRequest={handleSendRequest}
             onRespondRequest={handleRespondRequest}
             onCancelSentRequest={handleRemoveContact}
-            onUnblockUser={handleUnblockUser}
+            onPromptBlock={handleOpenBlockModal}
+            onUnblockUser={handleOpenUnblockModal}
             onStartChat={onStartChat}
             onRefresh={() =>
               loadDirectoryUsers(directorySearchQuery, directoryDeptFilter, directoryPage)
@@ -261,12 +292,25 @@ export const ContactsModule: React.FC<ContactsModuleProps> = ({ onStartChat }) =
             blockedContacts={blockedContacts}
             isLoading={isLoading}
             actionLoadingId={actionLoadingId}
-            onUnblockUser={handleUnblockUser}
+            onUnblockUser={handleOpenUnblockModal}
             onRefresh={loadContacts}
           />
         )}
+
+        {/* Global Block / Unblock Confirmation Modal */}
+        <BlockConfirmModal
+          isOpen={modalState.isOpen}
+          type={modalState.type}
+          targetUser={modalState.targetUser}
+          isLoading={Boolean(
+            modalState.targetUser && actionLoadingId === modalState.targetUser.id
+          )}
+          onClose={() => setModalState({ isOpen: false, type: 'block', targetUser: null })}
+          onConfirm={handleConfirmModal}
+        />
       </main>
     </div>
   );
 };
 export default ContactsModule;
+

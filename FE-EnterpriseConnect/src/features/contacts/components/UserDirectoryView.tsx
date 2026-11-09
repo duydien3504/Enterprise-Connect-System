@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Search,
   UserPlus,
@@ -15,6 +15,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
+  MoreVertical,
+  Ban,
 } from 'lucide-react';
 import { Avatar } from '@/shared/components/Avatar';
 import type { UserListItem, RelationStatus } from '../types/contact.types';
@@ -35,6 +37,7 @@ interface UserDirectoryViewProps {
   onSendRequest: (receiverId: string) => void;
   onRespondRequest: (contactId: string, accept: boolean) => void;
   onCancelSentRequest: (targetUserId: string, fullName: string) => void;
+  onPromptBlock: (targetUserId: string, fullName: string) => void;
   onUnblockUser: (targetUserId: string, fullName: string) => void;
   onStartChat: (userId: string) => void;
   onRefresh: () => void;
@@ -56,10 +59,12 @@ export const UserDirectoryView: React.FC<UserDirectoryViewProps> = ({
   onSendRequest,
   onRespondRequest,
   onCancelSentRequest,
+  onPromptBlock,
   onUnblockUser,
   onStartChat,
   onRefresh,
 }) => {
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   return (
     <div className="flex flex-col h-full overflow-hidden bg-[#071e3d]/40">
       {/* Top Filter Bar */}
@@ -183,6 +188,53 @@ export const UserDirectoryView: React.FC<UserDirectoryViewProps> = ({
                         </p>
                       )}
                     </div>
+
+                    {/* Context menu for block/unblock */}
+                    {relation.status !== 'self' && (
+                      <div className="relative">
+                        <button
+                          onClick={() => setActiveMenuId(activeMenuId === user.id ? null : user.id)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#122e54] transition-all cursor-pointer"
+                          title="Tùy chọn"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+
+                        {activeMenuId === user.id && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-20"
+                              onClick={() => setActiveMenuId(null)}
+                            />
+                            <div className="absolute right-0 top-8 w-44 rounded-xl bg-[#07172b] border border-slate-700 shadow-2xl py-1.5 z-30 animate-in fade-in zoom-in-95">
+                              {relation.status === 'blocked' ? (
+                                <button
+                                  onClick={() => {
+                                    setActiveMenuId(null);
+                                    onUnblockUser(user.id, user.fullName);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs text-emerald-400 hover:bg-emerald-950/40 flex items-center gap-2 transition-colors cursor-pointer"
+                                >
+                                  <ShieldBan className="w-3.5 h-3.5" />
+                                  <span>Bỏ chặn người này</span>
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setActiveMenuId(null);
+                                    onPromptBlock(user.id, user.fullName);
+                                  }}
+                                  className="w-full px-3 py-2 text-left text-xs text-rose-300 hover:bg-rose-950/40 flex items-center gap-2 transition-colors cursor-pointer"
+                                >
+                                  <Ban className="w-3.5 h-3.5" />
+                                  <span>Chặn người dùng</span>
+                                </button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Actions adapted to relation status */}
