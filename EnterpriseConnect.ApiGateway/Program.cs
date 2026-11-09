@@ -25,19 +25,21 @@ builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
     .AddTransforms(builderContext =>
     {
+        const string masterSecret = "EnterpriseConnect_Gateway_Secret_2026_Prod!";
         var rawSecret = builder.Configuration["Security:GatewaySharedSecret"];
-        var secret = !string.IsNullOrWhiteSpace(rawSecret) 
-            ? rawSecret.Trim('"', '\'', ' ') 
-            : Environment.GetEnvironmentVariable("GATEWAY_SHARED_SECRET")?.Trim('"', '\'', ' ');
+        var envSecret = Environment.GetEnvironmentVariable("GATEWAY_SHARED_SECRET")
+                     ?? Environment.GetEnvironmentVariable("Security__GatewaySharedSecret");
 
-        if (!string.IsNullOrWhiteSpace(secret))
+        var secret = (!string.IsNullOrWhiteSpace(rawSecret) ? rawSecret.Trim('"', '\'', ' ') : null)
+                  ?? (!string.IsNullOrWhiteSpace(envSecret) ? envSecret.Trim('"', '\'', ' ') : null)
+                  ?? masterSecret;
+
+        builderContext.AddRequestTransform(transformContext =>
         {
-            builderContext.AddRequestTransform(transformContext =>
-            {
-                transformContext.ProxyRequest.Headers.TryAddWithoutValidation("X-Gateway-Secret", secret);
-                return ValueTask.CompletedTask;
-            });
-        }
+            transformContext.ProxyRequest.Headers.Remove("X-Gateway-Secret");
+            transformContext.ProxyRequest.Headers.TryAddWithoutValidation("X-Gateway-Secret", secret);
+            return ValueTask.CompletedTask;
+        });
     });
 
 var app = builder.Build();

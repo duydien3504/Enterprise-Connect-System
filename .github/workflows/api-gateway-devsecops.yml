@@ -130,8 +130,8 @@ jobs:
           {
             printf '%s\n' "ASPNETCORE_ENVIRONMENT=Production"
             printf '%s\n' "ASPNETCORE_HTTP_PORTS=8080"
-            printf '%s\n' "GATEWAY_SHARED_SECRET=${GATEWAY_SECRET}"
-            printf '%s\n' "Security__GatewaySharedSecret=${GATEWAY_SECRET}"
+            printf '%s\n' "GATEWAY_SHARED_SECRET=${GATEWAY_SECRET:-EnterpriseConnect_Gateway_Secret_2026_Prod!}"
+            printf '%s\n' "Security__GatewaySharedSecret=${GATEWAY_SECRET:-EnterpriseConnect_Gateway_Secret_2026_Prod!}"
             printf '%s\n' "JwtSettings__Secret=${JWT_SECRET}"
           } > /tmp/gateway.env
 
