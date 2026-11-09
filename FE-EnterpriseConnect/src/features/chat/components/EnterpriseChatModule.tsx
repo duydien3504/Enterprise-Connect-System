@@ -1,31 +1,100 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ConversationSidebar } from './ConversationSidebar';
 import { ChatTimeline } from './ChatTimeline';
 import { ConversationDetailDrawer } from './ConversationDetailDrawer';
 import { CreateConversationModal } from './CreateConversationModal';
+import { useConversationManager } from '../hooks/useConversationManager';
 import {
   MOCK_CONVERSATIONS,
   MOCK_MESSAGES_MAP,
   MOCK_AI_SUMMARIES,
-  MOCK_DIRECTORY_USERS,
 } from '../mock/chatMockData';
 import type {
   Conversation,
   Message,
   MessageAttachment,
-  CreateConversationPayload,
 } from '../types/chat.types';
+import { CheckCircle2, AlertCircle } from 'lucide-react';
 
-export const EnterpriseChatModule: React.FC = () => {
-  const [conversations, setConversations] = useState<Conversation[]>(MOCK_CONVERSATIONS);
+interface EnterpriseChatModuleProps {
+  targetUserIdToChat?: string | null;
+  onDirectChatHandled?: () => void;
+}
+
+export const EnterpriseChatModule: React.FC<EnterpriseChatModuleProps> = ({
+  targetUserIdToChat,
+  onDirectChatHandled,
+}) => {
+  const {
+    conversations: realConversations,
+    activeConversationId: realActiveId,
+    activeMembers,
+    activeSummary,
+    isLoadingMembers,
+    isSummarizing,
+    feedback,
+    selectConversation,
+    handleCreateDirect,
+    handleCreateGroup,
+    handleSummarize,
+  } = useConversationManager(targetUserIdToChat);
+
+  // Notify parent that direct chat was processed
+  useEffect(() => {
+    if (targetUserIdToChat && onDirectChatHandled) {
+      onDirectChatHandled();
+    }
+  }, [targetUserIdToChat, onDirectChatHandled]);
+
   const [activeConversationId, setActiveConversationId] = useState<string>('conv-1');
   const [messagesMap, setMessagesMap] = useState<Record<string, Message[]>>(MOCK_MESSAGES_MAP);
   const [isDrawerOpen, setIsDrawerOpen] = useState(true);
   const [drawerMode, setDrawerMode] = useState<'info' | 'ai-summary'>('info');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  const activeConversation =
-    conversations.find((c) => c.id === activeConversationId) || conversations[0];
+  // Sync real active ID when real conversations change
+  useEffect(() => {
+    if (realActiveId) {
+      setActiveConversationId(realActiveId);
+    }
+  }, [realActiveId]);
+
+  // Merge real conversations with fallback mock data
+  const displayConversations = useMemo<Conversation[]>(() => {
+    if (realConversations.length === 0) {
+      return MOCK_CONVERSATIONS;
+    }
+
+    return realConversations.map((c) => {
+      const isGroup = c.type === 2;
+      const title = c.name || (isGroup ? 'Nhóm chat' : 'Cuộc trò chuyện 1-1');
+
+      return {
+        id: c.id,
+        title,
+        isGroup,
+        type: c.type,
+        memberCount: c.memberCount,
+        avatarUrl: c.avatarUrl || undefined,
+        lastMessage: c.lastMessageAt ? 'Có tin nhắn mới' : 'Chưa có tin nhắn',
+        lastMessageAt: c.lastMessageAt
+          ? new Date(c.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : undefined,
+        unreadCount: 0,
+        participants: [],
+      };
+    });
+  }, [realConversations]);
+
+  const activeConversation: Conversation =
+    displayConversations.find((c) => c.id === activeConversationId) ||
+    displayConversations[0] || {
+      id: 'default',
+      title: 'Hội Thoại Doanh Nghiệp',
+      isGroup: false,
+      participants: [],
+    };
+
   const activeMessages = messagesMap[activeConversationId] || [];
   const activeAISummary = MOCK_AI_SUMMARIES[activeConversationId];
 
@@ -63,24 +132,10 @@ export const EnterpriseChatModule: React.FC = () => {
         : undefined,
     };
 
-    // Update message timeline
     setMessagesMap((prev) => ({
       ...prev,
       [activeConversationId]: [...(prev[activeConversationId] || []), newMessage],
     }));
-
-    // Update conversation sidebar last message
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === activeConversationId
-          ? {
-              ...c,
-              lastMessage: isToxicContent ? '[Tin nhắn vi phạm chính sách]' : content || 'Đã gửi tệp đính kèm',
-              lastMessageAt: newMessage.createdAt,
-            }
-          : c
-      )
-    );
   };
 
   // Add emoji reaction handler (POST /api/Messages/{id}/reaction)
@@ -131,60 +186,38 @@ export const EnterpriseChatModule: React.FC = () => {
     });
   };
 
-  // Create new conversation/group (POST /api/Conversations/direct or group)
-  const handleCreateConversation = (payload: CreateConversationPayload) => {
-    const newConvId = `conv-${Date.now()}`;
-    const selectedParticipants = MOCK_DIRECTORY_USERS.filter((u) =>
-      payload.participantIds.includes(u.id)
-    );
-
-    const newConv: Conversation = {
-      id: newConvId,
-      title: payload.title,
-      isGroup: payload.isGroup,
-      department: payload.department,
-      lastMessage: 'Hội thoại vừa được khởi tạo.',
-      lastMessageAt: 'Vừa xong',
-      unreadCount: 0,
-      isPinned: false,
-      participants: selectedParticipants,
-    };
-
-    setConversations((prev) => [newConv, ...prev]);
-    setActiveConversationId(newConvId);
-    setMessagesMap((prev) => ({
-      ...prev,
-      [newConvId]: [
-        {
-          id: `m-init-${Date.now()}`,
-          conversationId: newConvId,
-          senderId: 'system',
-          senderName: 'Hệ Thống EnterpriseConnect',
-          content: `Hội thoại "${payload.title}" đã được tạo thành công với chứng chỉ bảo mật Zero-Trust.`,
-          createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          isSelf: false,
-        },
-      ],
-    }));
-  };
-
   const handleOpenAISummary = () => {
     setDrawerMode('ai-summary');
     setIsDrawerOpen(true);
   };
 
   return (
-    <div className="flex-1 flex overflow-hidden h-full bg-[#071e3d]">
+    <div className="flex-1 flex overflow-hidden h-full bg-[#071e3d] relative">
+      {/* Floating Feedback Alert */}
+      {feedback && (
+        <div
+          className={`absolute top-4 right-4 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-2xl border animate-in fade-in slide-in-from-top-2 ${
+            feedback.type === 'success'
+              ? 'bg-emerald-950/90 border-emerald-500/50 text-emerald-200 shadow-emerald-900/30'
+              : 'bg-rose-950/90 border-rose-500/50 text-rose-200 shadow-rose-900/30'
+          }`}
+        >
+          {feedback.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+          )}
+          <span>{feedback.text}</span>
+        </div>
+      )}
+
       {/* Column 1: Conversations Sidebar (320px) */}
       <ConversationSidebar
-        conversations={conversations}
+        conversations={displayConversations}
         activeConversationId={activeConversationId}
         onSelectConversation={(id) => {
           setActiveConversationId(id);
-          // Mark as read
-          setConversations((prev) =>
-            prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
-          );
+          selectConversation(id);
         }}
         onOpenCreateModal={() => setIsCreateModalOpen(true)}
       />
@@ -206,16 +239,22 @@ export const EnterpriseChatModule: React.FC = () => {
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         conversation={activeConversation}
+        members={activeMembers}
+        isLoadingMembers={isLoadingMembers}
+        summary={activeSummary}
+        isSummarizing={isSummarizing}
+        onTriggerSummarize={handleSummarize}
         aiSummary={activeAISummary}
         activeMode={drawerMode}
         onSwitchMode={(mode) => setDrawerMode(mode)}
       />
 
-      {/* Create Conversation / Group Modal */}
+      {/* Create Conversation / Group Modal (POST /api/Conversations/direct & group) */}
       <CreateConversationModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        onCreate={handleCreateConversation}
+        onCreateDirect={handleCreateDirect}
+        onCreateGroup={handleCreateGroup}
       />
     </div>
   );

@@ -21,7 +21,7 @@ export interface MessageAttachment {
 export interface MessageReaction {
   emoji: string;
   count: number;
-  users: string[]; // List of user names
+  users: string[];
   hasReacted?: boolean;
 }
 
@@ -49,15 +49,59 @@ export interface Message {
 export interface Conversation {
   id: string;
   title: string;
+  name?: string | null;
   isGroup: boolean;
+  type?: number; // 1 = Direct, 2 = Group
   department?: string;
   avatarUrl?: string;
   lastMessage?: string;
   lastMessageAt?: string;
   unreadCount?: number;
+  memberCount?: number;
   isPinned?: boolean;
   participants: UserParticipant[];
   pinnedMessage?: Message;
+}
+
+// Backend DTOs from Messaging Service
+export interface ConversationItemDto {
+  id: string;
+  type: number; // 1 = Direct, 2 = Group
+  name?: string | null;
+  avatarUrl?: string | null;
+  memberCount: number;
+  lastMessageAt?: string | null;
+  createdAt: string;
+}
+
+export interface ConversationMemberDto {
+  userId: string;
+  memberRole: number; // 1 = Owner/Admin, 2 = Member
+  nickname?: string | null;
+  joinedAt: string;
+  lastReadAt?: string | null;
+  lastReadMessageId?: string | null;
+  // Optional enriched fields for UI
+  fullName?: string;
+  avatarUrl?: string | null;
+  email?: string;
+  departmentName?: string | null;
+}
+
+export interface ActionItemDto {
+  id?: string;
+  description: string;
+  assignee?: string | null;
+  dueDate?: string | null;
+  isCompleted?: boolean;
+}
+
+export interface ConversationSummaryResult {
+  summary: string;
+  keyPoints: string[];
+  decisions: string[];
+  actionItems: ActionItemDto[];
+  participants: string[];
 }
 
 export interface ActionItem {
@@ -94,4 +138,13 @@ export interface CreateConversationPayload {
   isGroup: boolean;
   department?: string;
   participantIds: string[];
+}
+
+export interface CreateDirectPayload {
+  targetUserId: string;
+}
+
+export interface CreateGroupPayload {
+  groupName: string;
+  memberIds: string[];
 }

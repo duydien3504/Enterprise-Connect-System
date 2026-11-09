@@ -35,8 +35,11 @@ export const API_ENDPOINTS = {
   // Messaging Service
   CONVERSATIONS: {
     BASE: '/api/Conversations',
+    DIRECT: '/api/Conversations/direct',
+    GROUP: '/api/Conversations/group',
     DETAIL: (id: string) => `/api/Conversations/${id}`,
     MEMBERS: (id: string) => `/api/Conversations/${id}/members`,
+    SUMMARIZE: (id: string) => `/api/Conversations/${id}/summarize`,
   },
   MESSAGES: {
     BASE: '/api/Messages',

@@ -19,16 +19,22 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
   const [search, setSearch] = useState('');
 
   const filteredConversations = conversations.filter((c) => {
+    const title = c.title || c.name || '';
+    const lastMsg = c.lastMessage || '';
+    const dept = c.department || '';
+    const isGrp = c.isGroup ?? (c.type === 2);
+
     const matchSearch =
-      c.title.toLowerCase().includes(search.toLowerCase()) ||
-      (c.department && c.department.toLowerCase().includes(search.toLowerCase())) ||
-      (c.lastMessage && c.lastMessage.toLowerCase().includes(search.toLowerCase()));
+      !search.trim() ||
+      title.toLowerCase().includes(search.toLowerCase()) ||
+      dept.toLowerCase().includes(search.toLowerCase()) ||
+      lastMsg.toLowerCase().includes(search.toLowerCase());
 
     if (!matchSearch) return false;
 
     if (filter === 'unread') return (c.unreadCount || 0) > 0;
-    if (filter === 'groups') return c.isGroup;
-    if (filter === 'direct') return !c.isGroup;
+    if (filter === 'groups') return isGrp;
+    if (filter === 'direct') return !isGrp;
     return true;
   });
 
@@ -105,7 +111,7 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
         </div>
       </div>
 
-      {/* Conversation Scroll List with Softened Padding & Hover Lift */}
+      {/* Conversation Scroll List */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
         {filteredConversations.length === 0 ? (
           <div className="p-8 text-center text-xs text-slate-400">
@@ -114,7 +120,14 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
         ) : (
           filteredConversations.map((conv) => {
             const isActive = conv.id === activeConversationId;
-            const isOnline = conv.participants.some((p) => p.status === 'online');
+            const isOnline = conv.participants?.some((p) => p.status === 'online') || false;
+            const title = conv.title || conv.name || (conv.type === 1 ? 'Hội thoại 1-1' : 'Nhóm chat');
+            const isGroup = conv.isGroup ?? (conv.type === 2);
+            const timeDisplay = conv.lastMessageAt
+              ? (conv.lastMessageAt.includes('T')
+                  ? new Date(conv.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                  : conv.lastMessageAt)
+              : '';
 
             return (
               <div
@@ -130,15 +143,15 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
                 <div className="relative shrink-0 mt-0.5">
                   <div
                     className={`w-11 h-11 rounded-xl flex items-center justify-center font-bold text-xs uppercase shadow-sm transition-transform duration-200 group-hover:scale-105 ${
-                      conv.isGroup
+                      isGroup
                         ? 'bg-[#081d36] border border-[#1d4ed8]/50 text-[#38bdf8]'
                         : 'bg-[#0052cc] text-white'
                     }`}
                   >
-                    {conv.isGroup ? (
+                    {isGroup ? (
                       <Users className="w-5 h-5 text-[#38bdf8]" />
                     ) : (
-                      conv.title.slice(0, 2)
+                      title.slice(0, 2)
                     )}
                   </div>
                   {isOnline && (
@@ -158,12 +171,14 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
                           isActive ? 'text-white' : 'text-slate-100 group-hover:text-white'
                         }`}
                       >
-                        {conv.title}
+                        {title}
                       </h4>
                     </div>
-                    <span className="text-xs text-slate-400 font-medium shrink-0 ml-1">
-                      {conv.lastMessageAt}
-                    </span>
+                    {timeDisplay && (
+                      <span className="text-[11px] text-slate-400 font-medium shrink-0 ml-1">
+                        {timeDisplay}
+                      </span>
+                    )}
                   </div>
 
                   {conv.department && (
@@ -174,7 +189,7 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
 
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-slate-300 truncate pr-2 leading-relaxed">
-                      {conv.lastMessage || 'Chưa có tin nhắn'}
+                      {conv.lastMessage || 'Bắt đầu cuộc trò chuyện...'}
                     </p>
 
                     {(conv.unreadCount || 0) > 0 && (

@@ -34,6 +34,7 @@ export const App: React.FC = () => {
   const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => tokenStorage.getUser());
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [directChatTargetUserId, setDirectChatTargetUserId] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<'chat' | 'contacts' | 'calls' | 'remote' | 'admin' | 'profile'>('chat');
   const [signalRState, setSignalRState] = useState<ConnectionState>('Disconnected');
@@ -335,7 +336,12 @@ export const App: React.FC = () => {
 
         {/* Workspace Body: Dynamic View */}
         <main className="flex flex-1 overflow-hidden">
-          {activeTab === 'chat' && <EnterpriseChatModule />}
+          {activeTab === 'chat' && (
+            <EnterpriseChatModule
+              targetUserIdToChat={directChatTargetUserId}
+              onDirectChatHandled={() => setDirectChatTargetUserId(null)}
+            />
+          )}
           {activeTab === 'profile' && (
             <UserProfileView
               onBackToWorkspace={() => setActiveTab('chat')}
@@ -345,7 +351,12 @@ export const App: React.FC = () => {
             />
           )}
           {activeTab === 'contacts' && (
-            <ContactsModule onStartChat={() => setActiveTab('chat')} />
+            <ContactsModule
+              onStartChat={(targetUserId) => {
+                setDirectChatTargetUserId(targetUserId);
+                setActiveTab('chat');
+              }}
+            />
           )}
           {activeTab !== 'chat' && activeTab !== 'profile' && activeTab !== 'contacts' && (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#071e3d] text-slate-300">
