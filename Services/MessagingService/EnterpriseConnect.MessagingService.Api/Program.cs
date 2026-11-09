@@ -1,4 +1,5 @@
 using System.Text;
+// v1.0.2 - Trigger Railway deployment with Gateway IP OriginShield & Swagger
 using EnterpriseConnect.BuildingBlocks.Infrastructure.Extensions;
 using EnterpriseConnect.BuildingBlocks.Infrastructure.Security;
 using EnterpriseConnect.MessagingService.Api.Extensions;
