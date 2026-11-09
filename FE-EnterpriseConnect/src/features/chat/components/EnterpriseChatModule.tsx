@@ -67,15 +67,21 @@ export const EnterpriseChatModule: React.FC<EnterpriseChatModuleProps> = ({
 
     return realConversations.map((c) => {
       const isGroup = c.type === 2;
-      const title = c.name || (isGroup ? 'Nhóm chat' : 'Cuộc trò chuyện 1-1');
+      const title = isGroup
+        ? (c.name || 'Nhóm chat')
+        : (c.partnerName || c.name || 'Đồng nghiệp');
+      const avatarUrl = isGroup
+        ? (c.avatarUrl || undefined)
+        : (c.partnerAvatar || c.avatarUrl || undefined);
 
       return {
         id: c.id,
         title,
+        name: title,
         isGroup,
         type: c.type,
         memberCount: c.memberCount,
-        avatarUrl: c.avatarUrl || undefined,
+        avatarUrl,
         lastMessage: c.lastMessageAt ? 'Có tin nhắn mới' : 'Chưa có tin nhắn',
         lastMessageAt: c.lastMessageAt
           ? new Date(c.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })

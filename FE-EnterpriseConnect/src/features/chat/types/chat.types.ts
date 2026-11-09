@@ -72,6 +72,9 @@ export interface ConversationItemDto {
   memberCount: number;
   lastMessageAt?: string | null;
   createdAt: string;
+  partnerId?: string;
+  partnerName?: string;
+  partnerAvatar?: string | null;
 }
 
 export interface ConversationMemberDto {
@@ -81,11 +84,12 @@ export interface ConversationMemberDto {
   joinedAt: string;
   lastReadAt?: string | null;
   lastReadMessageId?: string | null;
-  // Optional enriched fields for UI
+  // Enriched profile fields
   fullName?: string;
   avatarUrl?: string | null;
   email?: string;
   departmentName?: string | null;
+  position?: string | null;
 }
 
 export interface ActionItemDto {

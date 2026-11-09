@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { chatApi } from '../api/chatApi';
+import { userResolver } from '../api/userResolver';
+import { tokenStorage } from '@/core/storage/tokenStorage';
 import type {
   ConversationItemDto,
   ConversationMemberDto,
@@ -12,6 +14,9 @@ export interface ChatFeedback {
 }
 
 export function useConversationManager(initialTargetUserId?: string | null) {
+  const currentUser = tokenStorage.getUser();
+  const currentUserId = currentUser?.id;
+
   const [conversations, setConversations] = useState<ConversationItemDto[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
@@ -32,18 +37,83 @@ export function useConversationManager(initialTargetUserId?: string | null) {
     return () => clearTimeout(timer);
   }, [feedback]);
 
-  // Load conversations list
+  // Load members and enrich with profiles
+  const loadMembers = useCallback(
+    async (conversationId: string) => {
+      if (!conversationId) return;
+      try {
+        setIsLoadingMembers(true);
+        const rawMembers = await chatApi.getConversationMembers(conversationId);
+
+        // Enrich each member with FullName, Avatar, Department from User Resolver
+        const enrichedMembers: ConversationMemberDto[] = await Promise.all(
+          rawMembers.map(async (m) => {
+            const isSelf = Boolean(
+              currentUserId && m.userId.toLowerCase() === currentUserId.toLowerCase()
+            );
+            const profile = await userResolver.resolveUser(m.userId);
+
+            return {
+              ...m,
+              fullName: isSelf ? `${currentUser?.fullName || 'Bạn'} (Bạn)` : profile.fullName,
+              avatarUrl: isSelf ? currentUser?.avatarUrl : profile.avatarUrl,
+              email: isSelf ? currentUser?.email : profile.email,
+              departmentName: isSelf ? currentUser?.departmentName : profile.departmentName,
+              position: isSelf ? currentUser?.position : profile.position,
+            };
+          })
+        );
+
+        setMembersMap((prev) => ({ ...prev, [conversationId]: enrichedMembers }));
+        return enrichedMembers;
+      } catch {
+        return [];
+      } finally {
+        setIsLoadingMembers(false);
+      }
+    },
+    [currentUserId, currentUser]
+  );
+
+  // Load conversations list and resolve partner names for Direct 1-1 chats
   const loadConversations = useCallback(async () => {
     try {
       setIsLoadingConversations(true);
       const list = await chatApi.getConversations();
-      setConversations(list || []);
 
-      // If no active conversation yet and list has items, select the first one
-      if (list && list.length > 0) {
+      // Resolve partner info for each 1-1 direct conversation
+      const enrichedList = await Promise.all(
+        (list || []).map(async (conv) => {
+          if (conv.type === 1) {
+            try {
+              const members = await chatApi.getConversationMembers(conv.id);
+              const otherMember = members.find(
+                (m) => currentUserId && m.userId.toLowerCase() !== currentUserId.toLowerCase()
+              );
+              if (otherMember) {
+                const partner = await userResolver.resolveUser(otherMember.userId);
+                return {
+                  ...conv,
+                  partnerId: otherMember.userId,
+                  partnerName: partner.fullName,
+                  partnerAvatar: partner.avatarUrl,
+                };
+              }
+            } catch {
+              // Ignore and keep original
+            }
+          }
+          return conv;
+        })
+      );
+
+      setConversations(enrichedList);
+
+      // Select conversation
+      if (enrichedList.length > 0) {
         setActiveConversationId((prev) => {
-          if (prev && list.some((c) => c.id === prev)) return prev;
-          return list[0].id;
+          if (prev && enrichedList.some((c) => c.id === prev)) return prev;
+          return enrichedList[0].id;
         });
       }
     } catch {
@@ -51,26 +121,12 @@ export function useConversationManager(initialTargetUserId?: string | null) {
     } finally {
       setIsLoadingConversations(false);
     }
-  }, []);
+  }, [currentUserId]);
 
   // Initial load
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
-
-  // Load members of a conversation
-  const loadMembers = useCallback(async (conversationId: string) => {
-    if (!conversationId) return;
-    try {
-      setIsLoadingMembers(true);
-      const members = await chatApi.getConversationMembers(conversationId);
-      setMembersMap((prev) => ({ ...prev, [conversationId]: members || [] }));
-    } catch {
-      // Non-blocking error
-    } finally {
-      setIsLoadingMembers(false);
-    }
-  }, []);
 
   // When active conversation changes, load members if not cached
   useEffect(() => {
@@ -95,11 +151,17 @@ export function useConversationManager(initialTargetUserId?: string | null) {
     async (targetUserId: string) => {
       try {
         setIsLoadingConversations(true);
+        const partner = await userResolver.resolveUser(targetUserId);
         const { conversationId } = await chatApi.createDirectConversation(targetUserId);
+
         await loadConversations();
         setActiveConversationId(conversationId);
-        loadMembers(conversationId);
-        setFeedback({ type: 'success', text: 'Đã mở cuộc trò chuyện trực tiếp.' });
+        await loadMembers(conversationId);
+
+        setFeedback({
+          type: 'success',
+          text: `Đã mở cuộc trò chuyện với ${partner.fullName}.`,
+        });
         return conversationId;
       } catch {
         setFeedback({ type: 'error', text: 'Không thể tạo cuộc trò chuyện 1-1. Vui lòng thử lại.' });
@@ -129,7 +191,7 @@ export function useConversationManager(initialTargetUserId?: string | null) {
         });
         await loadConversations();
         setActiveConversationId(conversationId);
-        loadMembers(conversationId);
+        await loadMembers(conversationId);
         setFeedback({ type: 'success', text: `Đã tạo nhóm "${groupName}" thành công.` });
         return conversationId;
       } catch {
@@ -186,6 +248,7 @@ export function useConversationManager(initialTargetUserId?: string | null) {
   }, [summariesMap, activeConversationId]);
 
   return {
+    currentUser,
     conversations,
     activeConversationId,
     activeConversation,

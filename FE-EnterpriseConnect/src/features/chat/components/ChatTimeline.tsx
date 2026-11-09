@@ -15,6 +15,7 @@ import {
   Info,
   X,
 } from 'lucide-react';
+import { Avatar } from '@/shared/components/Avatar';
 import type { Conversation, Message, MessageAttachment } from '../types/chat.types';
 
 interface ChatTimelineProps {
@@ -102,12 +103,15 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
 
   return (
     <div className="flex-1 flex flex-col bg-[#071e3d] h-full overflow-hidden select-none">
-      {/* 1. Header Khung Chat - Dịu lại, chữ dễ đọc, hover mượt */}
+      {/* 1. Header Khung Chat */}
       <header className="h-16 px-6 bg-[#0c2340] border-b border-[#1d4ed8]/20 flex items-center justify-between shrink-0 shadow-sm">
         <div className="flex items-center gap-3.5 min-w-0">
-          <div className="w-11 h-11 rounded-xl bg-[#0052cc] text-white font-bold flex items-center justify-center text-sm shadow-md shrink-0 transition-transform duration-200 hover:scale-105">
-            {conversation.title.slice(0, 2).toUpperCase()}
-          </div>
+          <Avatar
+            name={conversation.title}
+            src={conversation.avatarUrl}
+            size="md"
+            status="online"
+          />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h3 className="text-base font-bold text-white truncate">{conversation.title}</h3>
@@ -120,7 +124,9 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
             <div className="flex items-center gap-2 text-xs text-slate-300">
               <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse" />
-                {conversation.participants.length} Thành viên trực tuyến
+                {conversation.isGroup
+                  ? `${conversation.memberCount || conversation.participants?.length || 2} Thành viên`
+                  : 'Đang hoạt động'}
               </span>
               <span className="text-slate-500">•</span>
               <span className="text-slate-400">Mã hóa Zero-Trust</span>

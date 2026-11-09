@@ -130,11 +130,13 @@ export const ConversationDetailDrawer: React.FC<ConversationDetailDrawerProps> =
           <>
             {/* Conversation Overview Card */}
             <div className="p-4 rounded-2xl bg-[#07172b] border border-slate-800 text-center shadow-md">
-              <div className="w-14 h-14 rounded-2xl bg-[#0052cc] text-white font-bold text-lg mx-auto flex items-center justify-center mb-3 shadow-md">
+              <div className="mx-auto flex items-center justify-center mb-3">
                 {isGroup ? (
-                  <Users className="w-7 h-7 text-white" />
+                  <div className="w-14 h-14 rounded-2xl bg-[#0052cc] text-white font-bold text-lg flex items-center justify-center shadow-md">
+                    <Users className="w-7 h-7 text-white" />
+                  </div>
                 ) : (
-                  title.slice(0, 2)
+                  <Avatar name={title} src={conversation.avatarUrl} size="lg" status="online" />
                 )}
               </div>
               <h3 className="text-sm font-bold text-white mb-1">{title}</h3>
@@ -164,7 +166,7 @@ export const ConversationDetailDrawer: React.FC<ConversationDetailDrawerProps> =
                 {members.length > 0 ? (
                   members.map((m) => {
                     const isOwner = m.memberRole === 1;
-                    const displayName = m.nickname || m.fullName || `User ${m.userId.slice(0, 8)}`;
+                    const displayName = m.fullName || m.nickname || 'Đồng nghiệp';
 
                     return (
                       <div
@@ -187,7 +189,7 @@ export const ConversationDetailDrawer: React.FC<ConversationDetailDrawerProps> =
                               )}
                             </p>
                             <p className="text-[10px] text-slate-400 truncate">
-                              Tham gia: {new Date(m.joinedAt).toLocaleDateString()}
+                              {m.departmentName || m.email || `Tham gia: ${new Date(m.joinedAt).toLocaleDateString()}`}
                             </p>
                           </div>
                         </div>
