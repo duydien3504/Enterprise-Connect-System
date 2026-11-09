@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { chatApi } from '../api/chatApi';
 import { userResolver } from '../api/userResolver';
 import { tokenStorage } from '@/core/storage/tokenStorage';
@@ -18,7 +18,11 @@ export function useConversationManager(initialTargetUserId?: string | null) {
   const currentUserId = currentUser?.id;
 
   const [conversations, setConversations] = useState<ConversationItemDto[]>([]);
+  const conversationsRef = useRef<ConversationItemDto[]>([]);
+  conversationsRef.current = conversations;
+
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const handledTargetIdRef = useRef<string | null>(null);
 
   // Cache maps for conversation-specific data
   const [membersMap, setMembersMap] = useState<Record<string, ConversationMemberDto[]>>({});
@@ -107,13 +111,28 @@ export function useConversationManager(initialTargetUserId?: string | null) {
         })
       );
 
-      setConversations(enrichedList);
+      // Deduplicate direct conversations by partnerId
+      const uniqueList: ConversationItemDto[] = [];
+      const seenPartners = new Set<string>();
+
+      for (const conv of enrichedList) {
+        if (conv.type === 1 && conv.partnerId) {
+          const key = conv.partnerId.toLowerCase();
+          if (seenPartners.has(key)) {
+            continue; // Skip duplicate direct conversation with the same partner
+          }
+          seenPartners.add(key);
+        }
+        uniqueList.push(conv);
+      }
+
+      setConversations(uniqueList);
 
       // Select conversation
-      if (enrichedList.length > 0) {
+      if (uniqueList.length > 0) {
         setActiveConversationId((prev) => {
-          if (prev && enrichedList.some((c) => c.id === prev)) return prev;
-          return enrichedList[0].id;
+          if (prev && uniqueList.some((c) => c.id === prev)) return prev;
+          return uniqueList[0].id;
         });
       }
     } catch {
@@ -146,12 +165,28 @@ export function useConversationManager(initialTargetUserId?: string | null) {
     [membersMap, loadMembers]
   );
 
-  // Handle direct conversation creation/opening
+  // Handle direct conversation creation/opening (Singleton pattern per partner)
   const handleCreateDirect = useCallback(
     async (targetUserId: string) => {
       try {
         setIsLoadingConversations(true);
         const partner = await userResolver.resolveUser(targetUserId);
+
+        // 1. In-memory check: if conversation already exists, immediately switch to it
+        const existing = conversationsRef.current.find(
+          (c) => c.type === 1 && c.partnerId?.toLowerCase() === targetUserId.toLowerCase()
+        );
+        if (existing) {
+          setActiveConversationId(existing.id);
+          loadMembers(existing.id);
+          setFeedback({
+            type: 'success',
+            text: `Đã mở cuộc trò chuyện với ${partner.fullName}.`,
+          });
+          return existing.id;
+        }
+
+        // 2. Otherwise create/fetch via backend API
         const { conversationId } = await chatApi.createDirectConversation(targetUserId);
 
         await loadConversations();
@@ -173,9 +208,10 @@ export function useConversationManager(initialTargetUserId?: string | null) {
     [loadConversations, loadMembers]
   );
 
-  // If initialTargetUserId is passed (e.g. from Contacts tab), trigger handleCreateDirect
+  // If initialTargetUserId is passed (e.g. from Contacts tab), trigger handleCreateDirect once
   useEffect(() => {
-    if (initialTargetUserId) {
+    if (initialTargetUserId && handledTargetIdRef.current !== initialTargetUserId) {
+      handledTargetIdRef.current = initialTargetUserId;
       handleCreateDirect(initialTargetUserId);
     }
   }, [initialTargetUserId, handleCreateDirect]);

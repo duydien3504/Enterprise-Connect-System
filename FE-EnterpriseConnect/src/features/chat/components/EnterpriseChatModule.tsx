@@ -65,7 +65,18 @@ export const EnterpriseChatModule: React.FC<EnterpriseChatModuleProps> = ({
       return MOCK_CONVERSATIONS;
     }
 
-    return realConversations.map((c) => {
+    // Defense-in-depth: Deduplicate direct conversations by partnerId or ID
+    const seenPartners = new Set<string>();
+    const deduplicated = realConversations.filter((c) => {
+      if (c.type === 1 && c.partnerId) {
+        const key = c.partnerId.toLowerCase();
+        if (seenPartners.has(key)) return false;
+        seenPartners.add(key);
+      }
+      return true;
+    });
+
+    return deduplicated.map((c) => {
       const isGroup = c.type === 2;
       const title = isGroup
         ? (c.name || 'Nhóm chat')

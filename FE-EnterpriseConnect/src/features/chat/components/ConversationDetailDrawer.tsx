@@ -53,8 +53,8 @@ export const ConversationDetailDrawer: React.FC<ConversationDetailDrawerProps> =
 
   if (!isOpen) return null;
 
-  const title = conversation.title || (conversation as any).name || (conversation.type === 1 ? 'Cuộc trò chuyện 1-1' : 'Nhóm chat');
   const isGroup = conversation.isGroup ?? (conversation.type === 2);
+  const title = conversation.title || (conversation as any).name || (isGroup ? 'Nhóm chat' : 'Đồng nghiệp');
 
   const toggleCheck = (idx: number) => {
     setLocalCheckedMap((prev) => ({ ...prev, [idx]: !prev[idx] }));
@@ -165,7 +165,10 @@ export const ConversationDetailDrawer: React.FC<ConversationDetailDrawerProps> =
               <div className="space-y-2">
                 {members.length > 0 ? (
                   members.map((m) => {
-                    const isOwner = m.memberRole === 1;
+                    // MemberRole: 1 = Member, 2 = Admin, 3 = Owner
+                    // For Direct 1-1 conversations, both users are peers (Thành viên)
+                    const isOwner = isGroup && m.memberRole === 3;
+                    const isAdmin = isGroup && m.memberRole === 2;
                     const displayName = m.fullName || m.nickname || 'Đồng nghiệp';
 
                     return (
@@ -184,7 +187,12 @@ export const ConversationDetailDrawer: React.FC<ConversationDetailDrawerProps> =
                               <span>{displayName}</span>
                               {isOwner && (
                                 <span title="Trưởng nhóm">
-                                  <Crown className="w-3 h-3 text-amber-400 shrink-0" />
+                                  <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                </span>
+                              )}
+                              {isAdmin && (
+                                <span title="Quản trị viên">
+                                  <ShieldCheck className="w-3.5 h-3.5 text-blue-400 shrink-0" />
                                 </span>
                               )}
                             </p>
@@ -198,10 +206,12 @@ export const ConversationDetailDrawer: React.FC<ConversationDetailDrawerProps> =
                           className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${
                             isOwner
                               ? 'bg-amber-950/60 text-amber-400 border border-amber-500/30'
+                              : isAdmin
+                              ? 'bg-blue-950/60 text-blue-400 border border-blue-500/30'
                               : 'bg-slate-800 text-slate-300'
                           }`}
                         >
-                          {isOwner ? 'Quản trị' : 'Thành viên'}
+                          {isOwner ? 'Trưởng nhóm' : isAdmin ? 'Quản trị' : 'Thành viên'}
                         </span>
                       </div>
                     );

@@ -7,6 +7,7 @@ namespace EnterpriseConnect.MessagingService.Application.Features.Conversations.
 
 public class CreateDirectConversationCommandHandler : IRequestHandler<CreateDirectConversationCommand, Guid>
 {
+    private static readonly SemaphoreSlim _lock = new(1, 1);
     private readonly IMessagingUnitOfWork _uow;
 
     public CreateDirectConversationCommandHandler(IMessagingUnitOfWork uow)
@@ -21,23 +22,39 @@ public class CreateDirectConversationCommandHandler : IRequestHandler<CreateDire
             throw new ArgumentException("Không thể tạo cuộc trò chuyện trực tiếp với chính mình.");
         }
 
+        // Fast-path check without acquiring semaphore
         var existing = await _uow.Conversations.FindDirectConversationAsync(request.CurrentUserId, request.TargetUserId, cancellationToken);
         if (existing != null)
         {
             return existing.Id;
         }
 
-        var conv = new Conversation
+        await _lock.WaitAsync(cancellationToken);
+        try
         {
-            Type = ConversationType.Direct
-        };
+            // Re-check after acquiring semaphore to prevent race conditions
+            existing = await _uow.Conversations.FindDirectConversationAsync(request.CurrentUserId, request.TargetUserId, cancellationToken);
+            if (existing != null)
+            {
+                return existing.Id;
+            }
 
-        conv.Members.Add(new ConversationMember { UserId = request.CurrentUserId, MemberRole = MemberRole.Member });
-        conv.Members.Add(new ConversationMember { UserId = request.TargetUserId, MemberRole = MemberRole.Member });
+            var conv = new Conversation
+            {
+                Type = ConversationType.Direct
+            };
 
-        await _uow.Conversations.AddAsync(conv, cancellationToken);
-        await _uow.SaveChangesAsync(cancellationToken);
+            conv.Members.Add(new ConversationMember { UserId = request.CurrentUserId, MemberRole = MemberRole.Member });
+            conv.Members.Add(new ConversationMember { UserId = request.TargetUserId, MemberRole = MemberRole.Member });
 
-        return conv.Id;
+            await _uow.Conversations.AddAsync(conv, cancellationToken);
+            await _uow.SaveChangesAsync(cancellationToken);
+
+            return conv.Id;
+        }
+        finally
+        {
+            _lock.Release();
+        }
     }
 }

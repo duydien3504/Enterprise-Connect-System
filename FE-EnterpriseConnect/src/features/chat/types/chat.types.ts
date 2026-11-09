@@ -79,7 +79,7 @@ export interface ConversationItemDto {
 
 export interface ConversationMemberDto {
   userId: string;
-  memberRole: number; // 1 = Owner/Admin, 2 = Member
+  memberRole: number; // 1 = Member, 2 = Admin, 3 = Owner
   nickname?: string | null;
   joinedAt: string;
   lastReadAt?: string | null;
