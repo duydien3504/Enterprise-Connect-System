@@ -100,4 +100,19 @@ public class OriginShieldMiddlewareTests
         nextInvoked.Should().BeTrue();
         context.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
     }
+
+    [Fact]
+    public async Task InvokeAsync_WhenFromGatewayIp_AllowsRequestWithoutSecret()
+    {
+        var nextInvoked = false;
+        var middleware = CreateMiddleware(_ => { nextInvoked = true; return Task.CompletedTask; }, BuildConfig(ExpectedSecret));
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/api/v1/protected";
+        context.Request.Headers["X-Forwarded-For"] = "13.238.207.194";
+
+        await middleware.InvokeAsync(context);
+
+        nextInvoked.Should().BeTrue();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+    }
 }

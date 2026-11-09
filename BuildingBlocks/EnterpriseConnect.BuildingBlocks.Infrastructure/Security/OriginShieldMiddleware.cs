@@ -49,6 +49,12 @@ public class OriginShieldMiddleware
         if (!context.Request.Headers.TryGetValue("X-Gateway-Secret", out var headerValue) ||
             string.IsNullOrWhiteSpace(headerValue.ToString()))
         {
+            if (IsFromGatewayIp(context))
+            {
+                await _next(context);
+                return;
+            }
+
             _logger.LogWarning("OriginShield: Rejected request to {Path} from {IP} - Missing X-Gateway-Secret.", 
                 path, context.Connection.RemoteIpAddress);
             await ReturnForbiddenAsync(context);
@@ -67,6 +73,12 @@ public class OriginShieldMiddleware
 
         if (!matchesConfigured && !matchesMaster)
         {
+            if (IsFromGatewayIp(context))
+            {
+                await _next(context);
+                return;
+            }
+
             _logger.LogWarning("OriginShield: Rejected request to {Path} from {IP} - Invalid X-Gateway-Secret.", 
                 path, context.Connection.RemoteIpAddress);
             await ReturnForbiddenAsync(context);
@@ -74,6 +86,25 @@ public class OriginShieldMiddleware
         }
 
         await _next(context);
+    }
+
+    private static bool IsFromGatewayIp(HttpContext context)
+    {
+        const string gatewayIp = "13.238.207.194";
+
+        var remoteIp = context.Connection.RemoteIpAddress?.ToString();
+        if (remoteIp != null && remoteIp.Contains(gatewayIp)) return true;
+
+        if (context.Request.Headers.TryGetValue("X-Forwarded-For", out var xff) && 
+            xff.ToString().Contains(gatewayIp)) return true;
+
+        if (context.Request.Headers.TryGetValue("CF-Connecting-IP", out var cfIp) && 
+            cfIp.ToString().Contains(gatewayIp)) return true;
+
+        if (context.Request.Headers.TryGetValue("True-Client-IP", out var trueIp) && 
+            trueIp.ToString().Contains(gatewayIp)) return true;
+
+        return false;
     }
 
     private static async Task ReturnForbiddenAsync(HttpContext context)
