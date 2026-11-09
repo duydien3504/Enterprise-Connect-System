@@ -49,6 +49,7 @@ export const API_ENDPOINTS = {
     PIN: (id: string) => `/api/Messages/${id}/pin`,
     RECALL: (id: string) => `/api/Messages/${id}/recall`,
     REACTION: (id: string) => `/api/Messages/${id}/reaction`,
+    CHECK_TOXIC: '/api/Messages/check-toxic',
   },
 
   // Media Service

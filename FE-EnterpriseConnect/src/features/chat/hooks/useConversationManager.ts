@@ -345,6 +345,78 @@ export function useConversationManager(initialTargetUserId?: string | null) {
       }
     });
 
+    const unsubscribeReaction = signalRManager.onMessageReacted(async (messageId, userId, emoji, isAdded) => {
+      console.log('[SignalR] Realtime MessageReacted:', { messageId, userId, emoji, isAdded });
+      const isSelf = Boolean(currentUserId && userId.toLowerCase() === currentUserId.toLowerCase());
+      let userName = isSelf ? 'Bạn' : 'Đồng nghiệp';
+      if (!isSelf) {
+        try {
+          const partner = await userResolver.resolveUser(userId);
+          userName = partner.fullName;
+        } catch {
+          // fallback
+        }
+      }
+
+      setMessagesMap((prev) => {
+        let changed = false;
+        const updatedMap: Record<string, Message[]> = {};
+        for (const [convId, msgList] of Object.entries(prev)) {
+          if (msgList.some((m) => m.id === messageId)) {
+            changed = true;
+            updatedMap[convId] = msgList.map((m) => {
+              if (m.id !== messageId) return m;
+              const existing = [...(m.reactions || [])];
+              const idx = existing.findIndex((r) => r.emoji === emoji);
+
+              if (isAdded) {
+                if (idx >= 0) {
+                  const curr = existing[idx];
+                  const users = curr.users.includes(userName) ? curr.users : [...curr.users, userName];
+                  existing[idx] = { ...curr, count: curr.count + 1, users, hasReacted: isSelf ? true : curr.hasReacted };
+                } else {
+                  existing.push({ emoji, count: 1, users: [userName], hasReacted: isSelf });
+                }
+              } else {
+                if (idx >= 0) {
+                  const curr = existing[idx];
+                  const users = curr.users.filter((u) => u !== userName);
+                  if (curr.count <= 1) {
+                    existing.splice(idx, 1);
+                  } else {
+                    existing[idx] = { ...curr, count: curr.count - 1, users, hasReacted: isSelf ? false : curr.hasReacted };
+                  }
+                }
+              }
+              return { ...m, reactions: existing };
+            });
+          } else {
+            updatedMap[convId] = msgList;
+          }
+        }
+        return changed ? updatedMap : prev;
+      });
+    });
+
+    const unsubscribePinned = signalRManager.onMessagePinned((messageId, isPinned) => {
+      console.log('[SignalR] Realtime MessagePinned:', { messageId, isPinned });
+      setMessagesMap((prev) => {
+        let changed = false;
+        const updatedMap: Record<string, Message[]> = {};
+        for (const [convId, msgList] of Object.entries(prev)) {
+          if (msgList.some((m) => m.id === messageId)) {
+            changed = true;
+            updatedMap[convId] = msgList.map((m) =>
+              m.id === messageId ? { ...m, isPinned } : m
+            );
+          } else {
+            updatedMap[convId] = msgList;
+          }
+        }
+        return changed ? updatedMap : prev;
+      });
+    });
+
     const unsubscribeToxic = signalRManager.onToxicWarning((warning) => {
       setFeedback({ type: 'error', text: warning });
     });
@@ -352,6 +424,8 @@ export function useConversationManager(initialTargetUserId?: string | null) {
     return () => {
       unsubscribeMsg();
       unsubscribeTyping();
+      unsubscribeReaction();
+      unsubscribePinned();
       unsubscribeToxic();
     };
   }, [currentUserId, currentUser, loadConversations]);
@@ -614,22 +688,8 @@ export function useConversationManager(initialTargetUserId?: string | null) {
       if (!activeConversationId) return;
       try {
         await chatApi.reactMessage(messageId, emoji);
-        setMessagesMap((prev) => ({
-          ...prev,
-          [activeConversationId]: (prev[activeConversationId] || []).map((m) => {
-            if (m.id !== messageId) return m;
-            const existing = [...(m.reactions || [])];
-            const found = existing.find((r) => r.emoji === emoji);
-            if (found) {
-              found.count += 1;
-            } else {
-              existing.push({ emoji, count: 1, users: ['Bạn'] });
-            }
-            return { ...m, reactions: existing };
-          }),
-        }));
-      } catch {
-        // fail silently
+      } catch (err) {
+        console.warn('[Chat] Failed to react message:', err);
       }
     },
     [activeConversationId]

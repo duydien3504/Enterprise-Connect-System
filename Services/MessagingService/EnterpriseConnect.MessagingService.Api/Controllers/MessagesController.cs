@@ -20,17 +20,20 @@ public class MessagesController : ControllerBase
     private readonly IToxicDetectionService _toxicService;
     private readonly ICurrentUserService _currentUserService;
     private readonly IHubContext<ChatHub, IChatClient> _hubContext;
+    private readonly IMessagingUnitOfWork _uow;
 
     public MessagesController(
         IMediator mediator, 
         IToxicDetectionService toxicService,
         ICurrentUserService currentUserService,
-        IHubContext<ChatHub, IChatClient> hubContext)
+        IHubContext<ChatHub, IChatClient> hubContext,
+        IMessagingUnitOfWork uow)
     {
         _mediator = mediator;
         _toxicService = toxicService;
         _currentUserService = currentUserService;
         _hubContext = hubContext;
+        _uow = uow;
     }
 
     [HttpPost]
@@ -86,8 +89,14 @@ public class MessagesController : ControllerBase
         var currentUserId = _currentUserService.UserId
             ?? throw new UnauthorizedAccessException("Không xác định được danh tính người dùng.");
 
-        await _mediator.Send(new ReactMessageCommand(id, currentUserId, request.Emoji), cancellationToken);
-        return Ok(new { message = "Đã cập nhật cảm xúc tin nhắn." });
+        var message = await _uow.Messages.GetByIdAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException("Không tìm thấy tin nhắn.");
+
+        var isAdded = await _mediator.Send(new ReactMessageCommand(id, currentUserId, request.Emoji), cancellationToken);
+
+        await _hubContext.Clients.Group(message.ConversationId.ToString()).MessageReacted(id, currentUserId, request.Emoji, isAdded);
+
+        return Ok(new { isAdded, message = isAdded ? "Đã thả cảm xúc." : "Đã gỡ cảm xúc." });
     }
 
     [HttpPost("{id:guid}/pin")]
@@ -96,7 +105,13 @@ public class MessagesController : ControllerBase
         var currentUserId = _currentUserService.UserId
             ?? throw new UnauthorizedAccessException("Không xác định được danh tính người dùng.");
 
+        var message = await _uow.Messages.GetByIdAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException("Không tìm thấy tin nhắn.");
+
         var isPinned = await _mediator.Send(new TogglePinMessageCommand(id, currentUserId), cancellationToken);
+
+        await _hubContext.Clients.Group(message.ConversationId.ToString()).MessagePinned(id, isPinned, currentUserId);
+
         return Ok(new { isPinned, message = isPinned ? "Đã ghim tin nhắn." : "Đã bỏ ghim tin nhắn." });
     }
 

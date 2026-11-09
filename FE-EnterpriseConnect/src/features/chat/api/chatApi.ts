@@ -122,10 +122,21 @@ export const chatApi = {
   /**
    * Thả cảm xúc vào tin nhắn (POST /api/Messages/{id}/reaction)
    */
-  reactMessage: async (messageId: string, emoji: string): Promise<{ message: string }> => {
-    const { data } = await apiClient.post<{ message: string }>(
+  reactMessage: async (messageId: string, emoji: string): Promise<{ isAdded?: boolean; message: string }> => {
+    const { data } = await apiClient.post<{ isAdded?: boolean; message: string }>(
       API_ENDPOINTS.MESSAGES.REACTION(messageId),
       { emoji }
+    );
+    return data;
+  },
+
+  /**
+   * Kiểm tra mức độ độc hại / nội dung nhạy cảm của tin nhắn (POST /api/Messages/check-toxic)
+   */
+  checkToxic: async (content: string): Promise<{ isToxic: boolean; severity: string; reason: string }> => {
+    const { data } = await apiClient.post<{ isToxic: boolean; severity: string; reason: string }>(
+      API_ENDPOINTS.MESSAGES.CHECK_TOXIC,
+      { content }
     );
     return data;
   },

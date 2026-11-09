@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Avatar } from '@/shared/components/Avatar';
 import { signalRManager } from '@/core/signalr/signalRManager';
+import { chatApi } from '../api/chatApi';
 import type { Conversation, Message, MessageAttachment } from '../types/chat.types';
 
 interface ChatTimelineProps {
@@ -57,6 +58,10 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
   const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([]);
   const [showPinnedBanner, setShowPinnedBanner] = useState(true);
 
+  // Proactive AI Toxic Content Detection state (POST /api/Messages/check-toxic)
+  const [toxicWarning, setToxicWarning] = useState<{ isToxic: boolean; severity: string; reason: string } | null>(null);
+  const toxicCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -68,7 +73,10 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
   const pinnedMessage = pinnedMessages?.[0] || messages.find((m) => m.isPinned);
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInputText(e.target.value);
+    const val = e.target.value;
+    setInputText(val);
+
+    // 1. Broadcast typing indicator via SignalR
     if (conversation.id && conversation.id !== 'empty') {
       signalRManager.sendTyping(conversation.id, true);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -76,15 +84,44 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
         signalRManager.sendTyping(conversation.id, false);
       }, 2500);
     }
+
+    // 2. Realtime Proactive AI Content Security check (POST /api/Messages/check-toxic)
+    if (toxicCheckTimeoutRef.current) clearTimeout(toxicCheckTimeoutRef.current);
+    if (!val.trim() || val.trim().length < 3) {
+      setToxicWarning(null);
+    } else {
+      toxicCheckTimeoutRef.current = setTimeout(async () => {
+        try {
+          const res = await chatApi.checkToxic(val.trim());
+          if (res.isToxic && (res.severity === 'Medium' || res.severity === 'High')) {
+            setToxicWarning(res);
+          } else {
+            setToxicWarning(null);
+          }
+        } catch {
+          // Non-blocking fallback
+        }
+      }, 600);
+    }
   };
 
   const handleSend = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!inputText.trim() && pendingAttachments.length === 0) return;
 
+    // Zero-Trust CyberSec Guard: Prevent sending if confirmed toxic by AI moderation
+    if (toxicWarning && toxicWarning.isToxic) {
+      alert(`⚠️ Cảnh báo An Ninh Mạng (${toxicWarning.severity}): ${toxicWarning.reason}`);
+      return;
+    }
+
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = null;
+    }
+    if (toxicCheckTimeoutRef.current) {
+      clearTimeout(toxicCheckTimeoutRef.current);
+      toxicCheckTimeoutRef.current = null;
     }
     if (conversation.id && conversation.id !== 'empty') {
       signalRManager.sendTyping(conversation.id, false);
@@ -100,6 +137,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
     setReplyingTo(null);
     setPendingAttachments([]);
     setShowEmojiBar(false);
+    setToxicWarning(null);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -450,7 +488,11 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
                         key={i}
                         onClick={() => onAddReaction(msg.id, react.emoji)}
                         title={`Phản hồi bởi: ${react.users.join(', ')}`}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-[#0c2340] border border-[#1d4ed8]/40 hover:border-[#38bdf8] text-slate-200 transition-all duration-150 hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border transition-all duration-150 hover:scale-105 active:scale-95 cursor-pointer shadow-sm ${
+                          react.hasReacted
+                            ? 'bg-[#0052cc]/40 border-[#38bdf8] text-sky-200 shadow-sky-900/30'
+                            : 'bg-[#0c2340] border-[#1d4ed8]/40 hover:border-[#38bdf8] text-slate-200'
+                        }`}
                       >
                         <span className="text-sm">{react.emoji}</span>
                         <span className="font-mono font-bold text-xs">{react.count}</span>
@@ -489,9 +531,32 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
               </div>
               <button
                 onClick={() => setReplyingTo(null)}
-                className="text-slate-400 hover:text-white p-1 hover:bg-white/10 rounded-lg transition-colors"
+                className="text-slate-400 hover:text-white p-1 hover:bg-white/10 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Proactive Zero-Trust AI Toxic Scanner Banner (POST /api/Messages/check-toxic) */}
+          {toxicWarning && (
+            <div className="mb-2.5 px-3 py-2 rounded-xl bg-rose-950/90 border border-rose-500/60 flex items-center justify-between text-xs text-rose-200 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-150">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0 animate-pulse" />
+                <div className="leading-snug">
+                  <span className="font-bold text-rose-300">
+                    Cảnh báo Vi Phạm An Ninh Mạng ({toxicWarning.severity}):{' '}
+                  </span>
+                  <span>{toxicWarning.reason}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setToxicWarning(null)}
+                className="text-rose-400 hover:text-white p-1 rounded-lg hover:bg-rose-900/50 transition-colors cursor-pointer"
+                title="Bỏ qua cảnh báo"
+              >
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
           )}
