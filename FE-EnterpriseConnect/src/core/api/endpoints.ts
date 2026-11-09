@@ -11,6 +11,7 @@ export const API_ENDPOINTS = {
     SESSIONS: '/api/Auth/sessions',
   },
   USERS: {
+    LIST: '/api/Users',
     PROFILE: '/api/Users/profile',
     UPDATE: '/api/Users/profile',
     AVATAR: '/api/Users/profile/avatar',
@@ -21,6 +22,7 @@ export const API_ENDPOINTS = {
     RESPOND: (id: string) => `/api/Contacts/respond/${id}`,
     BLOCK: (id: string) => `/api/Contacts/block/${id}`,
     UNBLOCK: (id: string) => `/api/Contacts/unblock/${id}`,
+    REMOVE: (id: string) => `/api/Contacts/${id}`,
   },
   DIRECTORY: {
     TREE: '/api/Directory/tree',

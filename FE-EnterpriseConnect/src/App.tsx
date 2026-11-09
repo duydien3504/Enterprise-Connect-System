@@ -21,6 +21,7 @@ import { LandingHero3D } from '@/features/landing/components/LandingHero3D';
 import { LoginModal } from '@/features/landing/components/LoginModal';
 import { EnterpriseChatModule } from '@/features/chat/components/EnterpriseChatModule';
 import { UserProfileView } from '@/features/profile/components/UserProfileView';
+import { ContactsModule } from '@/features/contacts/components/ContactsModule';
 import type { SessionType, UserProfile } from '@/features/auth/types/auth.types';
 
 export const App: React.FC = () => {
@@ -343,16 +344,17 @@ export const App: React.FC = () => {
               onProfileUpdated={(updated) => setCurrentUser(updated)}
             />
           )}
-          {activeTab !== 'chat' && activeTab !== 'profile' && (
+          {activeTab === 'contacts' && (
+            <ContactsModule onStartChat={() => setActiveTab('chat')} />
+          )}
+          {activeTab !== 'chat' && activeTab !== 'profile' && activeTab !== 'contacts' && (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#071e3d] text-slate-300">
               <div className="w-16 h-16 rounded-2xl bg-[#0c2340] border border-[#1d4ed8]/40 flex items-center justify-center text-[#38bdf8] mb-4 shadow-xl">
-                {activeTab === 'contacts' && <Users className="w-8 h-8" />}
                 {activeTab === 'calls' && <PhoneCall className="w-8 h-8" />}
                 {activeTab === 'remote' && <Monitor className="w-8 h-8" />}
                 {activeTab === 'admin' && <ShieldAlert className="w-8 h-8" />}
               </div>
               <h3 className="text-lg font-bold text-white mb-2">
-                {activeTab === 'contacts' && 'Danh Bạ Doanh Nghiệp Tập Trung'}
                 {activeTab === 'calls' && 'Hội Thoại & Video Call WebRTC'}
                 {activeTab === 'remote' && 'Hỗ Trợ Từ Xa & Điều Khiển Màn Hình'}
                 {activeTab === 'admin' && 'Trung Tâm Giám Sát An Ninh & Audit Forensics'}
