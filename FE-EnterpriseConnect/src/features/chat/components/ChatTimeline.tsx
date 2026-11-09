@@ -14,6 +14,7 @@ import {
   Download,
   Info,
   X,
+  ArrowLeft,
 } from 'lucide-react';
 import { Avatar } from '@/shared/components/Avatar';
 import type { Conversation, Message, MessageAttachment } from '../types/chat.types';
@@ -29,6 +30,7 @@ interface ChatTimelineProps {
   onSendMessage: (content: string, replyToId?: string, attachments?: MessageAttachment[]) => void;
   onAddReaction: (messageId: string, emoji: string) => void;
   onPinMessage: (messageId: string) => void;
+  onBackToList?: () => void;
 }
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '🎉'];
@@ -44,6 +46,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
   onSendMessage,
   onAddReaction,
   onPinMessage,
+  onBackToList,
 }) => {
   const [inputText, setInputText] = useState('');
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
@@ -108,8 +111,17 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
   return (
     <div className="flex-1 flex flex-col bg-[#071e3d] h-full overflow-hidden select-none">
       {/* 1. Header Khung Chat */}
-      <header className="h-16 px-6 bg-[#0c2340] border-b border-[#1d4ed8]/20 flex items-center justify-between shrink-0 shadow-sm">
-        <div className="flex items-center gap-3.5 min-w-0">
+      <header className="h-16 px-3 sm:px-6 bg-[#0c2340] border-b border-[#1d4ed8]/20 flex items-center justify-between shrink-0 shadow-sm">
+        <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
+          {onBackToList && (
+            <button
+              onClick={onBackToList}
+              title="Quay lại danh sách hội thoại"
+              className="md:hidden p-2 rounded-xl text-slate-300 hover:text-white bg-[#07172b] border border-slate-700/80 mr-1 hover:scale-105 active:scale-95 transition-all cursor-pointer shrink-0"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          )}
           <Avatar
             name={conversation.title}
             src={conversation.avatarUrl}
@@ -118,33 +130,33 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
           />
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-bold text-white truncate">{conversation.title}</h3>
+              <h3 className="text-sm sm:text-base font-bold text-white truncate">{conversation.title}</h3>
               {conversation.department && (
                 <span className="hidden sm:inline-block text-xs font-semibold text-[#38bdf8] bg-[#07172b] px-2.5 py-0.5 rounded-full border border-slate-700/80">
                   {conversation.department}
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2 text-xs text-slate-300">
-              <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse" />
+            <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-slate-300">
+              <span className="flex items-center gap-1 sm:gap-1.5 text-emerald-400 font-medium">
+                <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-400 inline-block animate-pulse" />
                 {conversation.isGroup
                   ? `${conversation.memberCount || conversation.participants?.length || 2} Thành viên`
                   : 'Đang hoạt động'}
               </span>
               <span className="text-slate-500">•</span>
-              <span className="text-slate-400">Mã hóa Zero-Trust</span>
+              <span className="text-slate-400 hidden xs:inline">Mã hóa Zero-Trust</span>
             </div>
           </div>
         </div>
 
         {/* Action Buttons in Header with Hover Micro-interactions */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           {/* AI Copilot Summarize Button */}
           <button
             onClick={onOpenAISummary}
             title="Kích hoạt Trợ lý Tri thức AI tóm tắt cuộc thảo luận"
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#0052cc] hover:bg-[#0065ff] active:scale-95 text-white text-xs font-bold shadow-md transition-all duration-200 hover:scale-105 cursor-pointer"
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-2 rounded-xl bg-[#0052cc] hover:bg-[#0065ff] active:scale-95 text-white text-xs font-bold shadow-md transition-all duration-200 hover:scale-105 cursor-pointer"
           >
             <Sparkles className="w-4 h-4 text-[#38bdf8]" />
             <span className="hidden md:inline">Tóm Tắt AI</span>
@@ -154,7 +166,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
           <button
             onClick={() => alert('Đang kích hoạt WebRTC Audio Call với phòng ban...')}
             title="Bắt đầu cuộc gọi thoại WebRTC"
-            className="w-10 h-10 rounded-xl bg-[#07172b] hover:bg-[#0f2747] text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#07172b] hover:bg-[#0f2747] text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
           >
             <Phone className="w-4 h-4 text-emerald-400" />
           </button>
@@ -163,7 +175,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
           <button
             onClick={() => alert('Đang khởi tạo WebRTC Video Conference mã hóa E2E...')}
             title="Bắt đầu cuộc gọi video"
-            className="w-10 h-10 rounded-xl bg-[#07172b] hover:bg-[#0f2747] text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#07172b] hover:bg-[#0f2747] text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
           >
             <Video className="w-4 h-4 text-sky-400" />
           </button>
@@ -172,7 +184,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
           <button
             onClick={onToggleDrawer}
             title={isDrawerOpen ? 'Đóng bảng chi tiết' : 'Mở chi tiết nhóm & file'}
-            className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer shadow-sm ${
+            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl border flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer shadow-sm ${
               isDrawerOpen
                 ? 'bg-[#0052cc] text-white border-[#0052cc]'
                 : 'bg-[#07172b] text-slate-300 hover:text-white border-slate-700/80 hover:bg-[#0f2747]'

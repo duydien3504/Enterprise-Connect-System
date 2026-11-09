@@ -85,8 +85,8 @@ export const ContactsModule: React.FC<ContactsModuleProps> = ({ onStartChat }) =
 
   return (
     <div className="flex flex-1 h-full overflow-hidden bg-[#071e3d]">
-      {/* 1. Left Sub-Sidebar (280px) */}
-      <aside className="w-72 bg-[#07172b] border-r border-slate-800 flex flex-col shrink-0 select-none">
+      {/* 1. Left Sub-Sidebar (280px on desktop, hidden on mobile) */}
+      <aside className="hidden md:flex w-72 bg-[#07172b] border-r border-slate-800 flex-col shrink-0 select-none">
         {/* Module Header */}
         <div className="p-5 border-b border-slate-800/80 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -212,6 +212,33 @@ export const ContactsModule: React.FC<ContactsModuleProps> = ({ onStartChat }) =
 
       {/* 2. Right Workspace Panel */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Mobile Top Sub-nav Tabs (md:hidden) */}
+        <div className="md:hidden flex items-center gap-1.5 p-2 bg-[#07172b] border-b border-slate-800 overflow-x-auto shrink-0 select-none">
+          {[
+            { id: 'accepted', label: 'Bạn bè', count: acceptedContacts.length },
+            { id: 'pending', label: 'Lời mời', count: pendingReceivedContacts.length || pendingSentContacts.length },
+            { id: 'directory', label: 'Tìm kiếm', count: directoryTotalCount },
+            { id: 'blocked', label: 'Đã chặn', count: blockedContacts.length },
+          ].map(({ id, label, count }) => (
+            <button
+              key={id}
+              onClick={() => setActiveSubTab(id as any)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                activeSubTab === id
+                  ? 'bg-[#0052cc] text-white shadow-sm'
+                  : 'bg-[#0c2340] text-slate-300 hover:text-white'
+              }`}
+            >
+              <span>{label}</span>
+              {count > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 font-mono font-bold">
+                  {count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
         {/* Floating Feedback Notification */}
         {feedback && (
           <div

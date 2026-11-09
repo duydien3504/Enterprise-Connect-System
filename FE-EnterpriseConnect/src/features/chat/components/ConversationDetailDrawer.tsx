@@ -63,7 +63,14 @@ export const ConversationDetailDrawer: React.FC<ConversationDetailDrawerProps> =
   const hasSummary = Boolean(summary || aiSummary);
 
   return (
-    <aside className="w-[340px] shrink-0 flex flex-col bg-[#0c2340] border-l border-[#1d4ed8]/20 h-full overflow-hidden select-none animate-in slide-in-from-right duration-200">
+    <>
+      {/* Backdrop overlay on Tablet & Mobile (< xl) */}
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-xs z-40 xl:hidden animate-in fade-in duration-200"
+        onClick={onClose}
+      />
+
+      <aside className="fixed inset-y-0 right-0 z-50 w-full sm:w-[360px] xl:relative xl:w-[340px] xl:z-auto shrink-0 flex flex-col bg-[#0c2340] border-l border-[#1d4ed8]/20 h-full overflow-hidden select-none shadow-2xl xl:shadow-none animate-in slide-in-from-right duration-200">
       {/* Top Header */}
       <div className="h-16 px-5 border-b border-[#1d4ed8]/20 flex items-center justify-between bg-[#081d36]/50">
         <div className="flex items-center gap-2">
@@ -423,5 +430,6 @@ export const ConversationDetailDrawer: React.FC<ConversationDetailDrawerProps> =
         )}
       </div>
     </aside>
+    </>
   );
 };

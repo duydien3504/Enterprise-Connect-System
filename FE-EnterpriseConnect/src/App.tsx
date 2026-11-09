@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Clock,
   ShieldCheck,
+  User,
 } from 'lucide-react';
 import { signalRManager, type ConnectionState } from '@/core/signalr/signalRManager';
 import { tokenStorage } from '@/core/storage/tokenStorage';
@@ -176,7 +177,7 @@ export const App: React.FC = () => {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-950 text-slate-100">
       {/* 1. App Left Rail Sidebar - Ergonomic & Softened Micro-interactions */}
-      <aside className="w-18 shrink-0 flex flex-col items-center justify-between border-r border-[#1d4ed8]/20 bg-[#0c2340] py-4 select-none z-20">
+      <aside className="hidden md:flex w-18 shrink-0 flex-col items-center justify-between border-r border-[#1d4ed8]/20 bg-[#0c2340] py-4 select-none z-20">
         <div className="flex flex-col items-center gap-6">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0052cc] text-white shadow-lg shadow-[#0052cc]/30 hover:scale-105 transition-transform duration-200">
             <Radio className="h-5 w-5 text-white" />
@@ -230,43 +231,41 @@ export const App: React.FC = () => {
       {/* 2. Main Workspace Layout */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Header Bar - Harmonized & Clean */}
-        <header className="h-16 px-6 bg-[#07172b] border-b border-slate-800 flex items-center justify-between shrink-0 z-10 select-none">
+        <header className="h-16 px-4 sm:px-6 bg-[#07172b] border-b border-slate-800 flex items-center justify-between shrink-0 z-10 select-none">
           {/* Left Title */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-[#0052cc] flex items-center justify-center text-white font-bold text-xs shadow-md">
-                EC
-              </div>
-              <div className="flex flex-col">
-                <h1 className="text-sm font-bold tracking-tight text-white leading-tight">
-                  Enterprise Connection
-                </h1>
-                <span className="text-xs text-[#38bdf8] font-medium leading-tight">
-                  {activeTab === 'chat' && 'Nhắn Tin Doanh Nghiệp Thời Gian Thực & AI Copilot'}
-                  {activeTab === 'contacts' && 'Danh Bạ Doanh Nghiệp'}
-                  {activeTab === 'calls' && 'Cuộc Gọi WebRTC E2E'}
-                  {activeTab === 'remote' && 'Hỗ Trợ Từ Xa'}
-                  {activeTab === 'admin' && 'Trung Tâm Giám Sát An Ninh'}
-                  {activeTab === 'profile' && 'Hồ Sơ Cá Nhân & Quản Trị Đặc Quyền'}
-                </span>
-              </div>
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-[#0052cc] flex items-center justify-center text-white font-bold text-xs shadow-md shrink-0">
+              EC
+            </div>
+            <div className="flex flex-col min-w-0">
+              <h1 className="text-sm font-bold tracking-tight text-white leading-tight truncate">
+                Enterprise Connection
+              </h1>
+              <span className="hidden sm:inline-block text-xs text-[#38bdf8] font-medium leading-tight truncate">
+                {activeTab === 'chat' && 'Nhắn Tin Doanh Nghiệp Thời Gian Thực & AI Copilot'}
+                {activeTab === 'contacts' && 'Danh Bạ Doanh Nghiệp'}
+                {activeTab === 'calls' && 'Cuộc Gọi WebRTC E2E'}
+                {activeTab === 'remote' && 'Hỗ Trợ Từ Xa'}
+                {activeTab === 'admin' && 'Trung Tâm Giám Sát An Ninh'}
+                {activeTab === 'profile' && 'Hồ Sơ Cá Nhân & Quản Trị Đặc Quyền'}
+              </span>
             </div>
           </div>
 
           {/* Right Status Cluster - UNIFIED SignalR, Session, RAM Countdown & Actions */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#0c2340] border border-[#1d4ed8]/40 shadow-sm text-xs">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <div className="flex items-center gap-1 sm:gap-1.5 p-1 rounded-xl bg-[#0c2340] border border-[#1d4ed8]/40 shadow-sm text-xs">
               {/* SignalR status */}
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#07172b] border border-slate-700/60 font-medium text-slate-300">
+              <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg bg-[#07172b] border border-slate-700/60 font-medium text-slate-300">
                 <Radio className="h-3.5 w-3.5 text-[#38bdf8]" />
                 <span className="font-semibold text-emerald-400 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  {signalRState}
+                  <span className="hidden sm:inline">{signalRState}</span>
                 </span>
               </div>
 
               {/* Session type */}
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#07172b] border border-slate-700/60 font-medium">
+              <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#07172b] border border-slate-700/60 font-medium">
                 {sessionType === 'persistent' ? (
                   <span className="text-emerald-400 flex items-center gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5" />
@@ -281,7 +280,7 @@ export const App: React.FC = () => {
               </div>
 
               {/* Token live countdown */}
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#07172b] border border-slate-700/60 font-mono font-medium text-[#38bdf8]">
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#07172b] border border-slate-700/60 font-mono font-medium text-[#38bdf8]">
                 <ShieldCheck className="w-3.5 h-3.5 text-[#38bdf8]" />
                 <span>Phiên: {formatCountdown(timeToExpiry)}</span>
               </div>
@@ -291,7 +290,7 @@ export const App: React.FC = () => {
                 onClick={handleManualRefresh}
                 disabled={isRefreshingToken}
                 title="Làm mới phiên làm việc ngay lập tức"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#0052cc] hover:bg-[#0065ff] hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer disabled:opacity-50 shadow-sm"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#0052cc] hover:bg-[#0065ff] hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer disabled:opacity-50 shadow-sm"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingToken ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">Làm mới</span>
@@ -299,7 +298,7 @@ export const App: React.FC = () => {
             </div>
 
             {refreshNotice && (
-              <span className="text-xs text-emerald-400 font-medium animate-in fade-in">
+              <span className="hidden md:inline text-xs text-emerald-400 font-medium animate-in fade-in">
                 {refreshNotice}
               </span>
             )}
@@ -308,7 +307,7 @@ export const App: React.FC = () => {
             <button
               onClick={() => setActiveTab('profile')}
               title="Xem hồ sơ cá nhân"
-              className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95 ${
+              className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-200 cursor-pointer hover:scale-105 active:scale-95 ${
                 activeTab === 'profile'
                   ? 'bg-[#122e54] border-[#38bdf8] text-white shadow-sm'
                   : 'bg-[#0c2340] border-[#1d4ed8]/40 text-slate-300 hover:bg-[#122e54] hover:text-white'
@@ -335,7 +334,7 @@ export const App: React.FC = () => {
         </header>
 
         {/* Workspace Body: Dynamic View */}
-        <main className="flex flex-1 overflow-hidden">
+        <main className="flex flex-1 overflow-hidden pb-16 md:pb-0">
           {activeTab === 'chat' && (
             <EnterpriseChatModule
               targetUserIdToChat={directChatTargetUserId}
@@ -383,6 +382,37 @@ export const App: React.FC = () => {
           )}
         </main>
       </div>
+
+      {/* 3. Mobile Bottom Navigation Bar (md:hidden) */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-[#0c2340] border-t border-[#1d4ed8]/20 z-30 flex items-center justify-around px-2 select-none shadow-2xl backdrop-blur-md">
+        {[
+          { id: 'chat', icon: MessageSquare, label: 'Tin nhắn' },
+          { id: 'contacts', icon: Users, label: 'Danh bạ' },
+          { id: 'calls', icon: PhoneCall, label: 'Cuộc gọi' },
+          { id: 'remote', icon: Monitor, label: 'Remote' },
+          { id: 'profile', icon: User, label: 'Hồ sơ' },
+        ].map(({ id, icon: Icon, label }) => {
+          const isActive = activeTab === id;
+          return (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id as typeof activeTab)}
+              className={`flex flex-col items-center justify-center flex-1 py-1 transition-all duration-150 cursor-pointer ${
+                isActive ? 'text-[#38bdf8] font-bold' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <div
+                className={`p-1.5 rounded-xl transition-all duration-150 ${
+                  isActive ? 'bg-[#0052cc]/30 shadow-sm scale-110' : ''
+                }`}
+              >
+                <Icon className="h-5 w-5" />
+              </div>
+              <span className="text-[10px] mt-0.5 leading-none">{label}</span>
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 };

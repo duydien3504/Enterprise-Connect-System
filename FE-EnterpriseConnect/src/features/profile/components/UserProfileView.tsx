@@ -734,7 +734,7 @@ export const UserProfileView: React.FC<UserProfileViewProps> = ({
             <span>Quay lại Hội Thoại</span>
           </button>
 
-          <div className="flex items-center gap-2 text-xs text-slate-400">
+          <div className="hidden md:flex items-center gap-2 text-xs text-slate-400">
             <span>Enterprise Workspace</span>
             <span>/</span>
             <span className="text-[#38bdf8] font-medium">Hồ Sơ Cá Nhân & Quản Trị Đặc Quyền</span>

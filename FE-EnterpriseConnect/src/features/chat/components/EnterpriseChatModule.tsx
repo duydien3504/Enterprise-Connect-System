@@ -37,10 +37,15 @@ export const EnterpriseChatModule: React.FC<EnterpriseChatModuleProps> = ({
     handleSummarize,
   } = useConversationManager(targetUserIdToChat);
 
+  const [mobileView, setMobileView] = useState<'list' | 'timeline'>('list');
+
   // Notify parent that direct chat was processed
   useEffect(() => {
-    if (targetUserIdToChat && onDirectChatHandled) {
-      onDirectChatHandled();
+    if (targetUserIdToChat) {
+      setMobileView('timeline');
+      if (onDirectChatHandled) {
+        onDirectChatHandled();
+      }
     }
   }, [targetUserIdToChat, onDirectChatHandled]);
 
@@ -134,31 +139,49 @@ export const EnterpriseChatModule: React.FC<EnterpriseChatModuleProps> = ({
         </div>
       )}
 
-      {/* Column 1: Conversations Sidebar (320px) with Loading Skeleton */}
-      <ConversationSidebar
-        conversations={displayConversations}
-        activeConversationId={activeConversationId}
-        isLoading={isLoadingConversations}
-        onSelectConversation={(id) => {
-          setActiveConversationId(id);
-          selectConversation(id);
-        }}
-        onOpenCreateModal={() => setIsCreateModalOpen(true)}
-      />
+      {/* Column 1: Conversations Sidebar (320px on desktop, full width on mobile when in list view) */}
+      <div
+        className={`h-full ${
+          mobileView === 'list'
+            ? 'flex flex-1 w-full md:flex-none md:w-80'
+            : 'hidden md:flex md:w-80 shrink-0'
+        }`}
+      >
+        <ConversationSidebar
+          conversations={displayConversations}
+          activeConversationId={activeConversationId}
+          isLoading={isLoadingConversations}
+          onSelectConversation={(id) => {
+            setActiveConversationId(id);
+            selectConversation(id);
+            setMobileView('timeline');
+          }}
+          onOpenCreateModal={() => setIsCreateModalOpen(true)}
+        />
+      </div>
 
       {/* Column 2: Main Chat Timeline with Real Messages, Pinned Banner, Reactions */}
-      <ChatTimeline
-        conversation={activeConversation}
-        messages={activeMessages}
-        isLoadingMessages={isLoadingMessages}
-        pinnedMessages={activePinnedMessages}
-        isDrawerOpen={isDrawerOpen}
-        onToggleDrawer={() => setIsDrawerOpen(!isDrawerOpen)}
-        onOpenAISummary={handleOpenAISummary}
-        onSendMessage={handleSendMessage}
-        onAddReaction={handleReact}
-        onPinMessage={handleTogglePin}
-      />
+      <div
+        className={`h-full ${
+          mobileView === 'timeline'
+            ? 'flex flex-1 w-full'
+            : 'hidden md:flex md:flex-1'
+        }`}
+      >
+        <ChatTimeline
+          conversation={activeConversation}
+          messages={activeMessages}
+          isLoadingMessages={isLoadingMessages}
+          pinnedMessages={activePinnedMessages}
+          isDrawerOpen={isDrawerOpen}
+          onToggleDrawer={() => setIsDrawerOpen(!isDrawerOpen)}
+          onOpenAISummary={handleOpenAISummary}
+          onSendMessage={handleSendMessage}
+          onAddReaction={handleReact}
+          onPinMessage={handleTogglePin}
+          onBackToList={() => setMobileView('list')}
+        />
+      </div>
 
       {/* Column 3: Details & AI Summary Drawer (340px) */}
       <ConversationDetailDrawer
