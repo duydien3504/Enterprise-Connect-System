@@ -43,9 +43,9 @@ if (args.Contains("--seed-only")) return;
 // 4. Request Pipeline
 app.UseForwardedHeaders();
 app.UseCors(CorsExtensions.PolicyName);
+app.UseIdentitySwagger(app.Environment);
 app.UseOriginShield();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
-app.UseIdentitySwagger(app.Environment);
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();

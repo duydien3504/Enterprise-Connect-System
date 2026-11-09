@@ -7,7 +7,13 @@ public static class SwaggerAggregatorExtensions
     public static IServiceCollection AddGatewaySwagger(this IServiceCollection services)
     {
         services.AddEndpointsApiExplorer();
-        services.AddHttpClient();
+        services.AddHttpClient("SwaggerAggregator", client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(10);
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+        });
         services.AddSingleton<UnifiedSwaggerService>();
         return services;
     }

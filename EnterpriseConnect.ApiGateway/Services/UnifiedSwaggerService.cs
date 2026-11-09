@@ -1,18 +1,21 @@
 namespace EnterpriseConnect.ApiGateway.Services;
 
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging;
 
 public class UnifiedSwaggerService
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _config;
+    private readonly ILogger<UnifiedSwaggerService> _logger;
     private static string? _cachedJson;
     private static DateTimeOffset _cacheExpiry = DateTimeOffset.MinValue;
 
-    public UnifiedSwaggerService(IHttpClientFactory httpClientFactory, IConfiguration config)
+    public UnifiedSwaggerService(IHttpClientFactory httpClientFactory, IConfiguration config, ILogger<UnifiedSwaggerService> logger)
     {
         _httpClientFactory = httpClientFactory;
         _config = config;
+        _logger = logger;
     }
 
     public async Task<string> GetUnifiedSwaggerJsonAsync(CancellationToken cancellationToken = default)
@@ -22,8 +25,7 @@ public class UnifiedSwaggerService
             return _cachedJson;
         }
 
-        var client = _httpClientFactory.CreateClient();
-        client.Timeout = TimeSpan.FromSeconds(10);
+        var client = _httpClientFactory.CreateClient("SwaggerAggregator");
 
         var secret = _config["Security:GatewaySharedSecret"] ?? Environment.GetEnvironmentVariable("GATEWAY_SHARED_SECRET");
         if (!string.IsNullOrWhiteSpace(secret))
@@ -103,9 +105,9 @@ public class UnifiedSwaggerService
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Service offline, ignore gracefully
+                _logger.LogWarning(ex, "Failed to fetch swagger definition from {Url}", url);
             }
         }
 

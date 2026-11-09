@@ -32,7 +32,9 @@ public class OriginShieldMiddleware
         }
 
         var path = context.Request.Path.Value ?? string.Empty;
-        if (path == "/" || path.StartsWith("/health", StringComparison.OrdinalIgnoreCase))
+        if (path == "/" || 
+            path.StartsWith("/health", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase))
         {
             await _next(context);
             return;

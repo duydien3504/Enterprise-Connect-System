@@ -41,6 +41,9 @@ public class OriginShieldMiddlewareTests
     [InlineData("/health")]
     [InlineData("/health/live")]
     [InlineData("/health/ready")]
+    [InlineData("/swagger")]
+    [InlineData("/swagger/v1/swagger.json")]
+    [InlineData("/swagger/index.html")]
     public async Task InvokeAsync_WhenPathIsBypassed_AllowsRequestWithoutHeader(string path)
     {
         var nextInvoked = false;

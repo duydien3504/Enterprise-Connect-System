@@ -103,9 +103,9 @@ using (var scope = app.Services.CreateScope())
 // 5. Request Pipeline
 app.UseForwardedHeaders();
 app.UseCors();
+app.UseRemoteSwagger(app.Environment);
 app.UseOriginShield();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
-app.UseRemoteSwagger(app.Environment);
 
 app.UseHttpsRedirection();
 app.UseAuthentication();
