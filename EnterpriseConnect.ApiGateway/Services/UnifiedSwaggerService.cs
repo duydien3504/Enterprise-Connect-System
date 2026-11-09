@@ -27,7 +27,11 @@ public class UnifiedSwaggerService
 
         var client = _httpClientFactory.CreateClient("SwaggerAggregator");
 
-        var secret = _config["Security:GatewaySharedSecret"] ?? Environment.GetEnvironmentVariable("GATEWAY_SHARED_SECRET");
+        var rawSecret = _config["Security:GatewaySharedSecret"];
+        var secret = !string.IsNullOrWhiteSpace(rawSecret)
+            ? rawSecret.Trim('"', '\'', ' ')
+            : Environment.GetEnvironmentVariable("GATEWAY_SHARED_SECRET")?.Trim('"', '\'', ' ');
+
         if (!string.IsNullOrWhiteSpace(secret))
         {
             client.DefaultRequestHeaders.TryAddWithoutValidation("X-Gateway-Secret", secret);

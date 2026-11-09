@@ -25,8 +25,11 @@ builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
     .AddTransforms(builderContext =>
     {
-        var secret = builder.Configuration["Security:GatewaySharedSecret"] 
-            ?? Environment.GetEnvironmentVariable("GATEWAY_SHARED_SECRET");
+        var rawSecret = builder.Configuration["Security:GatewaySharedSecret"];
+        var secret = !string.IsNullOrWhiteSpace(rawSecret) 
+            ? rawSecret.Trim('"', '\'', ' ') 
+            : Environment.GetEnvironmentVariable("GATEWAY_SHARED_SECRET")?.Trim('"', '\'', ' ');
+
         if (!string.IsNullOrWhiteSpace(secret))
         {
             builderContext.AddRequestTransform(transformContext =>
