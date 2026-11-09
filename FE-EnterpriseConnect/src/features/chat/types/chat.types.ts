@@ -32,6 +32,8 @@ export interface Message {
   senderName: string;
   senderAvatar?: string;
   content: string;
+  type?: number;
+  status?: number;
   createdAt: string;
   isSelf: boolean;
   replyTo?: {
@@ -133,8 +135,33 @@ export interface AISummaryReport {
 export interface SendMessagePayload {
   conversationId: string;
   content: string;
-  replyToId?: string;
+  type?: number;
+  replyToId?: string | null;
   attachments?: MessageAttachment[];
+}
+
+export interface MessageDto {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  content: string;
+  type: number;
+  status: number;
+  createdAt: string;
+  isEdited: boolean;
+  isPinned: boolean;
+  replyToId?: string | null;
+  reactions: string[];
+}
+
+export interface SendMessageResultDto {
+  isSuccess: boolean;
+  message?: MessageDto | null;
+  isToxicBlocked: boolean;
+  toxicReason?: string | null;
+  isAiResponse: boolean;
+  aiAnswer?: string | null;
+  aiSources?: string[] | null;
 }
 
 export interface CreateConversationPayload {

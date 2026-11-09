@@ -6,6 +6,8 @@ import type {
   ConversationItemDto,
   ConversationMemberDto,
   ConversationSummaryResult,
+  Message,
+  MessageDto,
 } from '../types/chat.types';
 
 export interface ChatFeedback {
@@ -26,10 +28,13 @@ export function useConversationManager(initialTargetUserId?: string | null) {
 
   // Cache maps for conversation-specific data
   const [membersMap, setMembersMap] = useState<Record<string, ConversationMemberDto[]>>({});
+  const [messagesMap, setMessagesMap] = useState<Record<string, Message[]>>({});
+  const [pinnedMessagesMap, setPinnedMessagesMap] = useState<Record<string, Message[]>>({});
   const [summariesMap, setSummariesMap] = useState<Record<string, ConversationSummaryResult>>({});
 
   // Loading flags
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [feedback, setFeedback] = useState<ChatFeedback | null>(null);
@@ -74,6 +79,99 @@ export function useConversationManager(initialTargetUserId?: string | null) {
         return [];
       } finally {
         setIsLoadingMembers(false);
+      }
+    },
+    [currentUserId, currentUser]
+  );
+
+  // Load real messages & pinned messages from Swagger endpoints (GET /api/Messages/conversation/{id})
+  const loadMessages = useCallback(
+    async (conversationId: string) => {
+      if (!conversationId) return [];
+      try {
+        setIsLoadingMessages(true);
+        const [rawMessages, rawPinned] = await Promise.all([
+          chatApi.getConversationMessages(conversationId, 0, 50).catch(() => [] as MessageDto[]),
+          chatApi.getPinnedMessages(conversationId).catch(() => [] as MessageDto[]),
+        ]);
+
+        const convertDtoToMessage = async (dto: MessageDto): Promise<Message> => {
+          const isSelf = Boolean(
+            currentUserId && dto.senderId.toLowerCase() === currentUserId.toLowerCase()
+          );
+
+          let senderName = isSelf ? 'Tôi' : 'Đồng nghiệp';
+          let senderAvatar: string | undefined = isSelf ? currentUser?.avatarUrl || undefined : undefined;
+
+          if (dto.senderId === '00000000-0000-0000-0000-000000000000') {
+            senderName = 'Trợ lý AI';
+          } else if (!isSelf) {
+            try {
+              const profile = await userResolver.resolveUser(dto.senderId);
+              senderName = profile.fullName;
+              senderAvatar = profile.avatarUrl || undefined;
+            } catch {
+              // fallback
+            }
+          }
+
+          const reactionCounts: Record<string, { count: number; users: string[] }> = {};
+          for (const r of dto.reactions || []) {
+            if (!reactionCounts[r]) reactionCounts[r] = { count: 0, users: [] };
+            reactionCounts[r].count += 1;
+          }
+          const formattedReactions = Object.entries(reactionCounts).map(([emoji, data]) => ({
+            emoji,
+            count: data.count,
+            users: data.users,
+          }));
+
+          const time = new Date(dto.createdAt).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+
+          return {
+            id: dto.id,
+            conversationId: dto.conversationId,
+            senderId: dto.senderId,
+            senderName,
+            senderAvatar,
+            content: dto.content,
+            createdAt: time,
+            isSelf,
+            isPinned: dto.isPinned,
+            type: dto.type,
+            status: dto.status,
+            reactions: formattedReactions,
+          };
+        };
+
+        const convertedMessages = await Promise.all(rawMessages.map(convertDtoToMessage));
+        const convertedPinned = await Promise.all(rawPinned.map(convertDtoToMessage));
+
+        // Link replyTo quotes
+        const msgMap = new Map<string, Message>();
+        convertedMessages.forEach((m) => msgMap.set(m.id, m));
+        for (let i = 0; i < convertedMessages.length; i++) {
+          const raw = rawMessages[i];
+          if (raw?.replyToId && msgMap.has(raw.replyToId)) {
+            const target = msgMap.get(raw.replyToId)!;
+            convertedMessages[i].replyTo = {
+              id: target.id,
+              senderName: target.senderName,
+              content: target.content,
+            };
+          }
+        }
+
+        setMessagesMap((prev) => ({ ...prev, [conversationId]: convertedMessages }));
+        setPinnedMessagesMap((prev) => ({ ...prev, [conversationId]: convertedPinned }));
+        return convertedMessages;
+      } catch {
+        return [];
+      } finally {
+        setIsLoadingMessages(false);
       }
     },
     [currentUserId, currentUser]
@@ -147,22 +245,26 @@ export function useConversationManager(initialTargetUserId?: string | null) {
     loadConversations();
   }, [loadConversations]);
 
-  // When active conversation changes, load members if not cached
+  // When active conversation changes, load members and messages if not cached
   useEffect(() => {
-    if (activeConversationId && !membersMap[activeConversationId]) {
-      loadMembers(activeConversationId);
+    if (activeConversationId) {
+      if (!membersMap[activeConversationId]) {
+        loadMembers(activeConversationId);
+      }
+      if (!messagesMap[activeConversationId]) {
+        loadMessages(activeConversationId);
+      }
     }
-  }, [activeConversationId, membersMap, loadMembers]);
+  }, [activeConversationId, membersMap, messagesMap, loadMembers, loadMessages]);
 
   // Select conversation
   const selectConversation = useCallback(
     (id: string) => {
       setActiveConversationId(id);
-      if (!membersMap[id]) {
-        loadMembers(id);
-      }
+      loadMembers(id);
+      loadMessages(id);
     },
-    [membersMap, loadMembers]
+    [loadMembers, loadMessages]
   );
 
   // Handle direct conversation creation/opening (Singleton pattern per partner)
@@ -179,6 +281,7 @@ export function useConversationManager(initialTargetUserId?: string | null) {
         if (existing) {
           setActiveConversationId(existing.id);
           loadMembers(existing.id);
+          loadMessages(existing.id);
           setFeedback({
             type: 'success',
             text: `Đã mở cuộc trò chuyện với ${partner.fullName}.`,
@@ -192,6 +295,7 @@ export function useConversationManager(initialTargetUserId?: string | null) {
         await loadConversations();
         setActiveConversationId(conversationId);
         await loadMembers(conversationId);
+        await loadMessages(conversationId);
 
         setFeedback({
           type: 'success',
@@ -205,7 +309,7 @@ export function useConversationManager(initialTargetUserId?: string | null) {
         setIsLoadingConversations(false);
       }
     },
-    [loadConversations, loadMembers]
+    [loadConversations, loadMembers, loadMessages]
   );
 
   // If initialTargetUserId is passed (e.g. from Contacts tab), trigger handleCreateDirect once
@@ -228,6 +332,7 @@ export function useConversationManager(initialTargetUserId?: string | null) {
         await loadConversations();
         setActiveConversationId(conversationId);
         await loadMembers(conversationId);
+        await loadMessages(conversationId);
         setFeedback({ type: 'success', text: `Đã tạo nhóm "${groupName}" thành công.` });
         return conversationId;
       } catch {
@@ -237,7 +342,136 @@ export function useConversationManager(initialTargetUserId?: string | null) {
         setIsLoadingConversations(false);
       }
     },
-    [loadConversations, loadMembers]
+    [loadConversations, loadMembers, loadMessages]
+  );
+
+  // Handle sending message with Optimistic UI & Toxic Content check
+  const handleSendMessage = useCallback(
+    async (content: string, replyToId?: string) => {
+      if (!activeConversationId || !content.trim()) return;
+
+      const trimmedContent = content.trim();
+      const tempId = `temp-${Date.now()}`;
+      const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      // Optimistic UI message
+      const optimisticMsg: Message = {
+        id: tempId,
+        conversationId: activeConversationId,
+        senderId: currentUserId || 'self',
+        senderName: 'Tôi',
+        senderAvatar: currentUser?.avatarUrl || undefined,
+        content: trimmedContent,
+        createdAt: nowTime,
+        isSelf: true,
+      };
+
+      setMessagesMap((prev) => ({
+        ...prev,
+        [activeConversationId]: [...(prev[activeConversationId] || []), optimisticMsg],
+      }));
+
+      try {
+        const result = await chatApi.sendMessage({
+          conversationId: activeConversationId,
+          content: trimmedContent,
+          replyToId,
+        });
+
+        if (result.isToxicBlocked) {
+          const toxicMsg: Message = {
+            id: `toxic-${Date.now()}`,
+            conversationId: activeConversationId,
+            senderId: currentUserId || 'self',
+            senderName: 'Bộ Lọc An Ninh Nội Bộ',
+            content: trimmedContent,
+            createdAt: nowTime,
+            isSelf: true,
+            isToxic: true,
+            toxicWarning:
+              result.toxicReason || 'Nội dung tin nhắn bị chặn do vi phạm chính sách bảo mật nội bộ.',
+          };
+
+          setMessagesMap((prev) => ({
+            ...prev,
+            [activeConversationId]: (prev[activeConversationId] || []).map((m) =>
+              m.id === tempId ? toxicMsg : m
+            ),
+          }));
+
+          setFeedback({
+            type: 'error',
+            text: `Tin nhắn bị chặn: ${result.toxicReason || 'Vi phạm chính sách an toàn'}`,
+          });
+          return;
+        }
+
+        // Successfully sent: reload messages from server
+        await loadMessages(activeConversationId);
+      } catch (err: any) {
+        setMessagesMap((prev) => ({
+          ...prev,
+          [activeConversationId]: (prev[activeConversationId] || []).filter((m) => m.id !== tempId),
+        }));
+        const errMsg = err?.response?.data?.message || 'Không thể gửi tin nhắn. Vui lòng thử lại.';
+        setFeedback({ type: 'error', text: errMsg });
+      }
+    },
+    [activeConversationId, currentUserId, currentUser, loadMessages]
+  );
+
+  // Handle pin/unpin message (POST /api/Messages/{id}/pin)
+  const handleTogglePin = useCallback(
+    async (messageId: string) => {
+      if (!activeConversationId) return;
+      try {
+        const { isPinned, message } = await chatApi.togglePinMessage(messageId);
+        setMessagesMap((prev) => ({
+          ...prev,
+          [activeConversationId]: (prev[activeConversationId] || []).map((m) =>
+            m.id === messageId ? { ...m, isPinned } : m
+          ),
+        }));
+
+        setFeedback({
+          type: 'success',
+          text: message || (isPinned ? 'Đã ghim tin nhắn.' : 'Đã bỏ ghim tin nhắn.'),
+        });
+
+        // Trigger load messages to synchronize pinned list
+        await loadMessages(activeConversationId);
+      } catch {
+        setFeedback({ type: 'error', text: 'Không thể thay đổi trạng thái ghim tin nhắn.' });
+      }
+    },
+    [activeConversationId, loadMessages]
+  );
+
+  // Handle reaction (POST /api/Messages/{id}/reaction)
+  const handleReact = useCallback(
+    async (messageId: string, emoji: string) => {
+      if (!activeConversationId) return;
+      try {
+        await chatApi.reactMessage(messageId, emoji);
+        setMessagesMap((prev) => ({
+          ...prev,
+          [activeConversationId]: (prev[activeConversationId] || []).map((m) => {
+            if (m.id !== messageId) return m;
+            const existing = [...(m.reactions || [])];
+            const found = existing.find((r) => r.emoji === emoji);
+            if (found) {
+              found.count += 1;
+            } else {
+              existing.push({ emoji, count: 1, users: ['Bạn'] });
+            }
+            return { ...m, reactions: existing };
+          }),
+        }));
+      } catch {
+        // fail silently
+      }
+    },
+    [activeConversationId]
   );
 
   // Handle AI Summarization
@@ -264,7 +498,7 @@ export function useConversationManager(initialTargetUserId?: string | null) {
     [activeConversationId]
   );
 
-  // Computed active conversation & active members/summary
+  // Computed active conversation & active members/summary/messages
   const activeConversation = useMemo(() => {
     return (
       conversations.find((c) => c.id === activeConversationId) ||
@@ -278,6 +512,16 @@ export function useConversationManager(initialTargetUserId?: string | null) {
     return membersMap[activeConversationId] || [];
   }, [membersMap, activeConversationId]);
 
+  const activeMessages = useMemo(() => {
+    if (!activeConversationId) return [];
+    return messagesMap[activeConversationId] || [];
+  }, [messagesMap, activeConversationId]);
+
+  const activePinnedMessages = useMemo(() => {
+    if (!activeConversationId) return [];
+    return pinnedMessagesMap[activeConversationId] || [];
+  }, [pinnedMessagesMap, activeConversationId]);
+
   const activeSummary = useMemo(() => {
     if (!activeConversationId) return null;
     return summariesMap[activeConversationId] || null;
@@ -289,17 +533,24 @@ export function useConversationManager(initialTargetUserId?: string | null) {
     activeConversationId,
     activeConversation,
     activeMembers,
+    activeMessages,
+    activePinnedMessages,
     activeSummary,
     isLoadingConversations,
+    isLoadingMessages,
     isLoadingMembers,
     isSummarizing,
     feedback,
     setFeedback,
     loadConversations,
+    loadMessages,
     selectConversation,
     loadMembers,
     handleCreateDirect,
     handleCreateGroup,
+    handleSendMessage,
+    handleTogglePin,
+    handleReact,
     handleSummarize,
   };
 }

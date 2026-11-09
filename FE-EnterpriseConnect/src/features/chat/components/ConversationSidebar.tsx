@@ -5,6 +5,7 @@ import type { Conversation, ConversationFilter } from '../types/chat.types';
 interface ConversationSidebarProps {
   conversations: Conversation[];
   activeConversationId: string;
+  isLoading?: boolean;
   onSelectConversation: (id: string) => void;
   onOpenCreateModal: () => void;
 }
@@ -12,6 +13,7 @@ interface ConversationSidebarProps {
 export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
   conversations,
   activeConversationId,
+  isLoading = false,
   onSelectConversation,
   onOpenCreateModal,
 }) => {
@@ -48,7 +50,7 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
               Hội Thoại
             </h2>
             <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-[#07172b] text-[#38bdf8] border border-slate-700/80">
-              {conversations.length}
+              {isLoading ? '...' : conversations.length}
             </span>
           </div>
 
@@ -113,9 +115,29 @@ export const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
 
       {/* Conversation Scroll List */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-        {filteredConversations.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-400">
-            Không tìm thấy cuộc trò chuyện phù hợp.
+        {isLoading ? (
+          <div className="space-y-2 p-1">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className="flex items-center gap-3 p-3 rounded-xl bg-[#07172b]/50 border border-slate-800/60 animate-pulse"
+              >
+                <div className="w-11 h-11 rounded-xl bg-slate-800/80 shrink-0" />
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <div className="h-3.5 w-28 bg-slate-800/80 rounded" />
+                    <div className="h-2.5 w-10 bg-slate-800/60 rounded" />
+                  </div>
+                  <div className="h-2.5 w-40 bg-slate-800/50 rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredConversations.length === 0 ? (
+          <div className="p-8 text-center text-xs text-slate-400 flex flex-col items-center justify-center space-y-2">
+            <span className="text-2xl">💬</span>
+            <p className="font-semibold text-slate-300">Không tìm thấy cuộc trò chuyện</p>
+            <p className="text-[11px] text-slate-500">Tạo nhóm mới hoặc kết nối đồng nghiệp từ Danh Bạ</p>
           </div>
         ) : (
           filteredConversations.map((conv) => {

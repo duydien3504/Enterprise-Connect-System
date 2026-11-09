@@ -4,16 +4,7 @@ import { ChatTimeline } from './ChatTimeline';
 import { ConversationDetailDrawer } from './ConversationDetailDrawer';
 import { CreateConversationModal } from './CreateConversationModal';
 import { useConversationManager } from '../hooks/useConversationManager';
-import {
-  MOCK_CONVERSATIONS,
-  MOCK_MESSAGES_MAP,
-  MOCK_AI_SUMMARIES,
-} from '../mock/chatMockData';
-import type {
-  Conversation,
-  Message,
-  MessageAttachment,
-} from '../types/chat.types';
+import type { Conversation } from '../types/chat.types';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface EnterpriseChatModuleProps {
@@ -29,13 +20,20 @@ export const EnterpriseChatModule: React.FC<EnterpriseChatModuleProps> = ({
     conversations: realConversations,
     activeConversationId: realActiveId,
     activeMembers,
+    activeMessages,
+    activePinnedMessages,
     activeSummary,
+    isLoadingConversations,
+    isLoadingMessages,
     isLoadingMembers,
     isSummarizing,
     feedback,
     selectConversation,
     handleCreateDirect,
     handleCreateGroup,
+    handleSendMessage,
+    handleTogglePin,
+    handleReact,
     handleSummarize,
   } = useConversationManager(targetUserIdToChat);
 
@@ -46,8 +44,7 @@ export const EnterpriseChatModule: React.FC<EnterpriseChatModuleProps> = ({
     }
   }, [targetUserIdToChat, onDirectChatHandled]);
 
-  const [activeConversationId, setActiveConversationId] = useState<string>('conv-1');
-  const [messagesMap, setMessagesMap] = useState<Record<string, Message[]>>(MOCK_MESSAGES_MAP);
+  const [activeConversationId, setActiveConversationId] = useState<string>('');
   const [isDrawerOpen, setIsDrawerOpen] = useState(true);
   const [drawerMode, setDrawerMode] = useState<'info' | 'ai-summary'>('info');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -59,10 +56,10 @@ export const EnterpriseChatModule: React.FC<EnterpriseChatModuleProps> = ({
     }
   }, [realActiveId]);
 
-  // Merge real conversations with fallback mock data
+  // Transform real conversations for sidebar display
   const displayConversations = useMemo<Conversation[]>(() => {
     if (realConversations.length === 0) {
-      return MOCK_CONVERSATIONS;
+      return [];
     }
 
     // Defense-in-depth: Deduplicate direct conversations by partnerId or ID
@@ -106,102 +103,11 @@ export const EnterpriseChatModule: React.FC<EnterpriseChatModuleProps> = ({
   const activeConversation: Conversation =
     displayConversations.find((c) => c.id === activeConversationId) ||
     displayConversations[0] || {
-      id: 'default',
+      id: activeConversationId || 'empty',
       title: 'Hội Thoại Doanh Nghiệp',
       isGroup: false,
       participants: [],
     };
-
-  const activeMessages = messagesMap[activeConversationId] || [];
-  const activeAISummary = MOCK_AI_SUMMARIES[activeConversationId];
-
-  // Send message handler with Toxic Content detection simulation
-  const handleSendMessage = (
-    content: string,
-    replyToId?: string,
-    attachments?: MessageAttachment[]
-  ) => {
-    const replyTarget = replyToId ? activeMessages.find((m) => m.id === replyToId) : undefined;
-
-    // Simulate Toxic Content Filter (POST /api/Messages/check-toxic)
-    const isToxicContent =
-      /lo\s*mat\s*khau|hack|leak|matkhau|password123/i.test(content);
-
-    const newMessage: Message = {
-      id: `msg-${Date.now()}`,
-      conversationId: activeConversationId,
-      senderId: 'current-user',
-      senderName: 'Tôi',
-      content,
-      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isSelf: true,
-      replyTo: replyTarget
-        ? {
-            id: replyTarget.id,
-            senderName: replyTarget.senderName,
-            content: replyTarget.content,
-          }
-        : undefined,
-      attachments,
-      isToxic: isToxicContent,
-      toxicWarning: isToxicContent
-        ? 'Nội dung tin nhắn đã bị chặn tự động do chứa từ khóa nhạy cảm vi phạm chính sách an ninh mạng Zero-Trust.'
-        : undefined,
-    };
-
-    setMessagesMap((prev) => ({
-      ...prev,
-      [activeConversationId]: [...(prev[activeConversationId] || []), newMessage],
-    }));
-  };
-
-  // Add emoji reaction handler (POST /api/Messages/{id}/reaction)
-  const handleAddReaction = (messageId: string, emoji: string) => {
-    setMessagesMap((prev) => {
-      const currentList = prev[activeConversationId] || [];
-      const updated = currentList.map((msg) => {
-        if (msg.id !== messageId) return msg;
-
-        const currentReactions = msg.reactions || [];
-        const existing = currentReactions.find((r) => r.emoji === emoji);
-
-        if (existing) {
-          return {
-            ...msg,
-            reactions: currentReactions.map((r) =>
-              r.emoji === emoji
-                ? { ...r, count: r.count + 1, users: [...r.users, 'Tôi'] }
-                : r
-            ),
-          };
-        } else {
-          return {
-            ...msg,
-            reactions: [...currentReactions, { emoji, count: 1, users: ['Tôi'] }],
-          };
-        }
-      });
-
-      return {
-        ...prev,
-        [activeConversationId]: updated,
-      };
-    });
-  };
-
-  // Pin message handler (POST /api/Messages/{id}/pin)
-  const handlePinMessage = (messageId: string) => {
-    setMessagesMap((prev) => {
-      const currentList = prev[activeConversationId] || [];
-      const updated = currentList.map((m) =>
-        m.id === messageId ? { ...m, isPinned: !m.isPinned } : m
-      );
-      return {
-        ...prev,
-        [activeConversationId]: updated,
-      };
-    });
-  };
 
   const handleOpenAISummary = () => {
     setDrawerMode('ai-summary');
@@ -228,10 +134,11 @@ export const EnterpriseChatModule: React.FC<EnterpriseChatModuleProps> = ({
         </div>
       )}
 
-      {/* Column 1: Conversations Sidebar (320px) */}
+      {/* Column 1: Conversations Sidebar (320px) with Loading Skeleton */}
       <ConversationSidebar
         conversations={displayConversations}
         activeConversationId={activeConversationId}
+        isLoading={isLoadingConversations}
         onSelectConversation={(id) => {
           setActiveConversationId(id);
           selectConversation(id);
@@ -239,16 +146,18 @@ export const EnterpriseChatModule: React.FC<EnterpriseChatModuleProps> = ({
         onOpenCreateModal={() => setIsCreateModalOpen(true)}
       />
 
-      {/* Column 2: Main Chat Timeline */}
+      {/* Column 2: Main Chat Timeline with Real Messages, Pinned Banner, Reactions */}
       <ChatTimeline
         conversation={activeConversation}
         messages={activeMessages}
+        isLoadingMessages={isLoadingMessages}
+        pinnedMessages={activePinnedMessages}
         isDrawerOpen={isDrawerOpen}
         onToggleDrawer={() => setIsDrawerOpen(!isDrawerOpen)}
         onOpenAISummary={handleOpenAISummary}
         onSendMessage={handleSendMessage}
-        onAddReaction={handleAddReaction}
-        onPinMessage={handlePinMessage}
+        onAddReaction={handleReact}
+        onPinMessage={handleTogglePin}
       />
 
       {/* Column 3: Details & AI Summary Drawer (340px) */}
@@ -261,7 +170,6 @@ export const EnterpriseChatModule: React.FC<EnterpriseChatModuleProps> = ({
         summary={activeSummary}
         isSummarizing={isSummarizing}
         onTriggerSummarize={handleSummarize}
-        aiSummary={activeAISummary}
         activeMode={drawerMode}
         onSwitchMode={(mode) => setDrawerMode(mode)}
       />

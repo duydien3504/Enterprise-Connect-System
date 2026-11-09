@@ -21,6 +21,8 @@ import type { Conversation, Message, MessageAttachment } from '../types/chat.typ
 interface ChatTimelineProps {
   conversation: Conversation;
   messages: Message[];
+  isLoadingMessages?: boolean;
+  pinnedMessages?: Message[];
   isDrawerOpen: boolean;
   onToggleDrawer: () => void;
   onOpenAISummary: () => void;
@@ -34,6 +36,8 @@ const QUICK_EMOJIS = ['👍', '❤️', '😂', '😮', '🎉'];
 export const ChatTimeline: React.FC<ChatTimelineProps> = ({
   conversation,
   messages,
+  isLoadingMessages = false,
+  pinnedMessages = [],
   isDrawerOpen,
   onToggleDrawer,
   onOpenAISummary,
@@ -64,7 +68,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
     return () => clearTimeout(timer);
   }, [conversation.id]);
 
-  const pinnedMessage = messages.find((m) => m.isPinned);
+  const pinnedMessage = pinnedMessages?.[0] || messages.find((m) => m.isPinned);
 
   const handleSend = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -201,7 +205,75 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
 
       {/* 3. Khu Vực Dòng Thời Gian Tin Nhắn (Timeline) */}
       <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
-        {messages.map((msg) => {
+        {isLoadingMessages ? (
+          <div className="space-y-5 py-4 animate-in fade-in duration-200">
+            {/* Incoming skeleton */}
+            <div className="flex flex-col items-start space-y-1">
+              <div className="flex items-center gap-2 mb-1 px-1">
+                <div className="w-20 h-3 bg-slate-800 rounded animate-pulse" />
+                <div className="w-10 h-2.5 bg-slate-800/60 rounded animate-pulse" />
+              </div>
+              <div className="p-4 rounded-2xl rounded-bl-none bg-[#0c2340]/60 border border-slate-800/80 max-w-[65%] w-72 space-y-2 animate-pulse">
+                <div className="h-3 w-4/5 bg-slate-700/60 rounded" />
+                <div className="h-3 w-1/2 bg-slate-700/60 rounded" />
+              </div>
+            </div>
+            {/* Outgoing skeleton */}
+            <div className="flex flex-col items-end space-y-1">
+              <div className="flex items-center gap-2 mb-1 px-1">
+                <div className="w-10 h-2.5 bg-slate-800/60 rounded animate-pulse" />
+                <div className="w-12 h-3 bg-slate-800 rounded animate-pulse" />
+              </div>
+              <div className="p-4 rounded-2xl rounded-br-none bg-[#0052cc]/30 border border-blue-600/30 max-w-[65%] w-80 space-y-2 animate-pulse">
+                <div className="h-3 w-5/6 bg-blue-300/40 rounded" />
+                <div className="h-3 w-2/3 bg-blue-300/40 rounded" />
+              </div>
+            </div>
+            {/* Incoming skeleton 2 */}
+            <div className="flex flex-col items-start space-y-1">
+              <div className="flex items-center gap-2 mb-1 px-1">
+                <div className="w-24 h-3 bg-slate-800 rounded animate-pulse" />
+                <div className="w-10 h-2.5 bg-slate-800/60 rounded animate-pulse" />
+              </div>
+              <div className="p-4 rounded-2xl rounded-bl-none bg-[#0c2340]/60 border border-slate-800/80 max-w-[65%] w-64 space-y-2 animate-pulse">
+                <div className="h-3 w-3/4 bg-slate-700/60 rounded" />
+              </div>
+            </div>
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4 my-auto min-h-[300px]">
+            <div className="w-16 h-16 rounded-2xl bg-[#0c2340] border border-[#1d4ed8]/30 flex items-center justify-center text-white shadow-lg">
+              <Sparkles className="w-8 h-8 text-[#38bdf8]" />
+            </div>
+            <div className="max-w-md space-y-1.5">
+              <h4 className="text-base font-bold text-white">Bắt đầu cuộc trò chuyện bảo mật</h4>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Cuộc hội thoại này được bảo vệ bởi tiêu chuẩn mã hóa Zero-Trust. Nhập tin nhắn bên dưới hoặc gõ{' '}
+                <code className="text-[#38bdf8] font-mono bg-[#07172b] px-1.5 py-0.5 rounded border border-[#1d4ed8]/30">
+                  /a [câu hỏi]
+                </code>{' '}
+                để hỏi Trợ lý AI.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 justify-center max-w-sm pt-2">
+              <button
+                type="button"
+                onClick={() => setInputText('👋 Chào bạn, tiện trao đổi công việc nhé!')}
+                className="px-3 py-1.5 rounded-full text-xs bg-[#0c2340] hover:bg-[#0f2747] text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 transition-all cursor-pointer"
+              >
+                👋 Chào bạn
+              </button>
+              <button
+                type="button"
+                onClick={() => setInputText('/a Quy chế an toàn thông tin và bảo mật nội bộ?')}
+                className="px-3 py-1.5 rounded-full text-xs bg-[#0c2340] hover:bg-[#0f2747] text-[#38bdf8] hover:text-white border border-[#1d4ed8]/40 hover:border-[#38bdf8] transition-all cursor-pointer"
+              >
+                🤖 Hỏi Trợ lý AI
+              </button>
+            </div>
+          </div>
+        ) : (
+          messages.map((msg) => {
           const isSelf = msg.isSelf;
 
           // Toxic Message Warning Block
@@ -364,7 +436,7 @@ export const ChatTimeline: React.FC<ChatTimelineProps> = ({
               </div>
             </div>
           );
-        })}
+        }))}
 
         {/* 4. Typing Indicator */}
         {isTypingSimulated && (

@@ -5,8 +5,9 @@ import type {
   ConversationMemberDto,
   ConversationSummaryResult,
   CreateGroupPayload,
-  Message,
+  MessageDto,
   SendMessagePayload,
+  SendMessageResultDto,
 } from '../types/chat.types';
 
 export const chatApi = {
@@ -69,20 +70,63 @@ export const chatApi = {
   },
 
   /**
-   * Lấy danh sách tin nhắn của cuộc trò chuyện (GET /api/Messages)
+   * Lấy danh sách tin nhắn của cuộc trò chuyện (GET /api/Messages/conversation/{conversationId})
    */
-  getMessages: async (conversationId: string, page = 1, pageSize = 50): Promise<Message[]> => {
-    const { data } = await apiClient.get<Message[]>(API_ENDPOINTS.MESSAGES.BASE, {
-      params: { conversationId, page, pageSize },
-    });
+  getConversationMessages: async (
+    conversationId: string,
+    skip = 0,
+    take = 50
+  ): Promise<MessageDto[]> => {
+    const { data } = await apiClient.get<MessageDto[]>(
+      API_ENDPOINTS.MESSAGES.BY_CONVERSATION(conversationId),
+      {
+        params: { skip, take },
+      }
+    );
+    return data;
+  },
+
+  /**
+   * Lấy danh sách tin nhắn đã ghim (GET /api/Messages/conversation/{conversationId}/pinned)
+   */
+  getPinnedMessages: async (conversationId: string): Promise<MessageDto[]> => {
+    const { data } = await apiClient.get<MessageDto[]>(
+      API_ENDPOINTS.MESSAGES.PINNED(conversationId)
+    );
     return data;
   },
 
   /**
    * Gửi tin nhắn mới (POST /api/Messages)
    */
-  sendMessage: async (payload: SendMessagePayload): Promise<Message> => {
-    const { data } = await apiClient.post<Message>(API_ENDPOINTS.MESSAGES.BASE, payload);
+  sendMessage: async (payload: SendMessagePayload): Promise<SendMessageResultDto> => {
+    const { data } = await apiClient.post<SendMessageResultDto>(API_ENDPOINTS.MESSAGES.BASE, {
+      conversationId: payload.conversationId,
+      content: payload.content,
+      type: payload.type || 1,
+      replyToId: payload.replyToId || null,
+    });
+    return data;
+  },
+
+  /**
+   * Ghim hoặc bỏ ghim tin nhắn (POST /api/Messages/{id}/pin)
+   */
+  togglePinMessage: async (messageId: string): Promise<{ isPinned: boolean; message: string }> => {
+    const { data } = await apiClient.post<{ isPinned: boolean; message: string }>(
+      API_ENDPOINTS.MESSAGES.PIN(messageId)
+    );
+    return data;
+  },
+
+  /**
+   * Thả cảm xúc vào tin nhắn (POST /api/Messages/{id}/reaction)
+   */
+  reactMessage: async (messageId: string, emoji: string): Promise<{ message: string }> => {
+    const { data } = await apiClient.post<{ message: string }>(
+      API_ENDPOINTS.MESSAGES.REACTION(messageId),
+      { emoji }
+    );
     return data;
   },
 };

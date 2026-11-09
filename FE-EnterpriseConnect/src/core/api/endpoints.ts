@@ -44,6 +44,8 @@ export const API_ENDPOINTS = {
   },
   MESSAGES: {
     BASE: '/api/Messages',
+    BY_CONVERSATION: (conversationId: string) => `/api/Messages/conversation/${conversationId}`,
+    PINNED: (conversationId: string) => `/api/Messages/conversation/${conversationId}/pinned`,
     PIN: (id: string) => `/api/Messages/${id}/pin`,
     RECALL: (id: string) => `/api/Messages/${id}/recall`,
     REACTION: (id: string) => `/api/Messages/${id}/reaction`,
